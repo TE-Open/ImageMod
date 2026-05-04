@@ -3,8 +3,6 @@
 //constant declarations
 static uint8_t trueColor[8][3] = {{0, 0, 0}, {255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 0}, {255, 0, 255}, {0, 255, 255}, {255, 255, 255}};
 static uint8_t blackWhiteColor[8][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {255, 255, 255}, {255, 255, 255}, {255, 255, 255}, {255, 255, 255}};
-//function prototypes
-static void Hash(char *sourceStr, char *resultStr, int len, char keyFlag, uint64_t baseHash, char *staticKey, int keyLen);
 
 void ColorReduce(uint8_t *pixels, int pixelCount, int hasAlpha, int blackWhite){
 	//this function takes the given pixel array, and converts each pixel into a specific color it is closest to
