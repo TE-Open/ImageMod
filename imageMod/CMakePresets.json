@@ -1,0 +1,56 @@
+{
+	"version": 10,
+	"cmakeMinimumRequired": {
+		"major": 4,
+		"minor": 0,
+		"patch": 0
+	},
+	"$comment": "Preset file for ImageMod shared library",
+	"configurePresets": [
+		{
+			"name": "imlr",
+			"displayName": "ImageMod linux release",
+			"binaryDir": "${sourceDir}/build/l/r",
+			"installDir": "${sourceDir}/install/l/r",
+			"generator": "MinGW Makefiles",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_C_COMPILER": "gcc",
+				"CMAKE_SYSTEM_NAME": "Linux",
+				"CMAKE_SYSTEM_VERSION": "5"
+			}
+		},
+		{
+			"name": "imld",
+			"inherits": "imlr",
+			"displayName": "ImageMod linux debug",
+			"binaryDir": "${sourceDir}/build/l/d",
+			"installDir": "${sourceDir}/install/l/d",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		},
+		{
+			"name": "imwr",
+			"inherits": "imlr",
+			"displayName": "ImageMod windows release",
+			"binaryDir": "${sourceDir}/build/w/r",
+			"installDir": "${sourceDir}/install/w/r",
+			"cacheVariables": {
+				"CMAKE_SYSTEM_NAME": "Windows",
+				"CMAKE_SYSTEM_VERSION": "5000",
+				"TARGET_WIN":"ON"
+			}
+		},
+		{
+			"name": "imwd",
+			"inherits": "imwr",
+			"displayName": "ImageMod windows debug",
+			"binaryDir": "${sourceDir}/build/w/d",
+			"installDir": "${sourceDir}/install/w/d",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug"
+			}
+		}
+	]
+}
