@@ -12,7 +12,7 @@ target_sources(ImageMod
 	PUBLIC
 		FILE_SET HEADERS
 		FILES
-			src/main.h
+			src/imageMod.h
 )
 
 set_target_properties(ImageMod PROPERTIES PREFIX "")

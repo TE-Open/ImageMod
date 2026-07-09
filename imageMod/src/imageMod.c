@@ -1,4 +1,4 @@
-#include "main.h"
+#include "imageMod.h"
 #include <stdlib.h>
 //constant declarations
 static uint8_t trueColor[8][3] = {{0, 0, 0}, {255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 0}, {255, 0, 255}, {0, 255, 255}, {255, 255, 255}};

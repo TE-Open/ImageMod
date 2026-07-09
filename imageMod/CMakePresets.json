@@ -11,7 +11,7 @@
 			"name": "imlr",
 			"displayName": "ImageMod linux release",
 			"binaryDir": "${sourceDir}/build/l/r",
-			"installDir": "${sourceDir}/install/l/r",
+			"installDir": "${sourceDir}/final/l/r",
 			"generator": "MinGW Makefiles",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Release",
@@ -25,7 +25,7 @@
 			"inherits": "imlr",
 			"displayName": "ImageMod linux debug",
 			"binaryDir": "${sourceDir}/build/l/d",
-			"installDir": "${sourceDir}/install/l/d",
+			"installDir": "${sourceDir}/final/l/d",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug"
 			}
@@ -35,7 +35,7 @@
 			"inherits": "imlr",
 			"displayName": "ImageMod windows release",
 			"binaryDir": "${sourceDir}/build/w/r",
-			"installDir": "${sourceDir}/install/w/r",
+			"installDir": "${sourceDir}/final/w/r",
 			"cacheVariables": {
 				"CMAKE_SYSTEM_NAME": "Windows",
 				"CMAKE_SYSTEM_VERSION": "5000",
@@ -47,7 +47,7 @@
 			"inherits": "imwr",
 			"displayName": "ImageMod windows debug",
 			"binaryDir": "${sourceDir}/build/w/d",
-			"installDir": "${sourceDir}/install/w/d",
+			"installDir": "${sourceDir}/final/w/d",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug"
 			}
