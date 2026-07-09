@@ -8,6 +8,7 @@ target_compile_features(ImageMod PRIVATE c_std_17)
 target_sources(ImageMod
 	PRIVATE
 		src/imageMod.c
+		src/imageMod.def
 
 	PUBLIC
 		FILE_SET HEADERS
@@ -16,10 +17,6 @@ target_sources(ImageMod
 )
 
 set_target_properties(ImageMod PROPERTIES PREFIX "")
-
-if(TARGET_WIN)
-	target_compile_definitions(ImageMod PRIVATE BUILD_DLL)
-endif()
 
 install(
 	TARGETS ImageMod
