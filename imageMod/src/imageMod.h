@@ -25,7 +25,7 @@ void SplitColor(ImageData* img, UBYTE* baseColor, int* threshold, int colorCount
 void ColorReplace(ImageData* img, int ignoreAlpha, UBYTE* oldColor, UBYTE* newColor);
 int FillSquareColor(ImageData* img, int sqx, int sqy, int sqw, int sqh, UBYTE* color);
 void PadImage(ImageData* imgPad, ImageData* img, int pad, UBYTE* paddingColor);
-void CropImage(uint8_t *imgPx, uint8_t *imgCropPx, uint32_t *rectDim, int width, int hasAlpha);
+void CopyArea(ImageData* imgCpy, ImageData* img, Area* area);
 void EraseLongSegments(uint8_t *imgPx, int width, int height, int hasAlpha, int maxWidth, int maxHeight, uint8_t *backgroundColor);
 int RemoveEmptyLines(uint8_t *imgPx, uint8_t *imgRPx, int width, int height, int hasAlpha, int maxLines, uint8_t *backgroundColor);
 float PixelMatch(uint8_t *smlImgPx, uint8_t *bigImgPx, int widthS, int heightS, int hasAlphaS, int widthB, int heightB, int hasAlphaB, int ignoreAlpha);

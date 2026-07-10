@@ -243,21 +243,21 @@ void PadImage(ImageData* imgPad, ImageData* img, int pad, UBYTE* paddingColor){
 	}
 }
 
-void CropImage(uint8_t *imgPx, uint8_t *imgCropPx, uint32_t *rectDim, int width, int hasAlpha){
-	//this function creates a copy of the defined rectangle in the image and copies it to the cropped image container
-    int i, j, k;
-    int top = (int) rectDim[0], bottom = (int) rectDim[1],  left = (int) rectDim[2],  right = (int) rectDim[3];
-    int pxLen = (hasAlpha)? 4 : 3;
-    int lineJump = ((width - right - 1 + left) * pxLen);
-    int pos = (top * width * pxLen) + (left * pxLen), posC = 0;
-    for (i = top; i <= bottom; i++){
-		for (j = left; j <= right; j++){
-			for (k = 0; k < pxLen; k++){
-				imgCropPx[posC++] = imgPx[pos++];
-			}
-		}
-		//at the end of each line we must jump to the beginning of the next line in the image
-		pos += lineJump;
+void CopyArea(ImageData* imgCpy, ImageData* img, Area* area){
+	//this function copies the defined area in the provided image to another image object
+	int i, pos, posC, pxLen, lineLen, lineLenC;
+	imgCpy->width = 1 + area->right - area->left;
+	imgCpy->height = 1 + area->bottom - area->top;
+	pxLen = 3 + (imgCpy->hasAlpha = img->hasAlpha);
+	lineLen = img->width * pxLen;
+	lineLenC = imgCpy->width * pxLen;
+	//copy each line of the source onto the copy, within the width of the area
+	pos = (area->top * lineLen) + (area->left * pxLen);
+	posC = 0;
+    for (i = 0; i < imgCpy->height; i++){
+		memcpy(&imgCpy->bA[posC], &img->bA[pos], lineLenC);
+		pos += lineLen;
+		posC += lineLenC;
     }
 }
 

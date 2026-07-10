@@ -59,9 +59,10 @@ class ImageModSL:
 			self.padImage = self.SL.PadImage
 			self.padImage.argtypes = [POINTER(ImageData), POINTER(ImageData), c_int, POINTER(c_ubyte)]
 			self.padImage.restype = None
-			#load the crop image function
-			self.cropImage = self.SL.CropImage
-			self.cropImage.argtypes = [POINTER(c_ubyte), POINTER(c_ubyte), POINTER(c_uint32), c_int, c_int]
+			#load the copy area function
+			self.copyArea = self.SL.CopyArea
+			self.copyArea.argtypes = [POINTER(ImageData), POINTER(ImageData), POINTER(Area)]
+			self.copyArea.restype = None
 			#load the erase long segments function
 			self.eraseLongSegments = self.SL.EraseLongSegments
 			self.eraseLongSegments.argtypes = [POINTER(c_ubyte), c_int, c_int, c_int, c_int, c_int, POINTER(c_ubyte)]

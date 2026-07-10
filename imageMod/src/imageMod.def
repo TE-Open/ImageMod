@@ -4,7 +4,7 @@ EXPORTS
 	ColorReplace
 	FillSquareColor
 	PadImage
-	CropImage
+	CopyArea
 	EraseLongSegments
 	RemoveEmptyLines
 	PixelMatch
