@@ -209,31 +209,37 @@ static inline int ColorLine(UBYTE* bA, UBYTE* color, int width, int top, int lef
 	return posStart;
 }
 
-void PadImage(uint8_t *pImgPx, uint8_t *imgPx, int width, int height, int hasAlpha, int pad, uint8_t *paddingColor){
+void PadImage(ImageData* imgPad, ImageData* img, int pad, UBYTE* paddingColor){
 	//this function padds the provided image and pads it by the requested value with the requested color
-	int pxDepth = (hasAlpha)? 4 : 3;
-	int pWidth = width + (pad * 2), pHeight = height + (pad * 2), pPxCount = pWidth * pHeight * pxDepth;
-	int i, pos = 0, posI = 0, top = pad, bottom = height + pad, left = pad, right = width + pad, row = 0, col = 0;
-	while (posI < pPxCount){
-		if ((row < top) || (row >= bottom) || (col < left) || (col >= right)){
-			//if the pixel is in the padding area, we copy the padding color
-			for (i = 0; i < pxDepth; i++){
-				pImgPx[posI + i] = paddingColor[i];
-			}
-		}
-		else {
-			//otherwise we copy the image
-			for (i = 0; i < pxDepth; i++){
-				pImgPx[posI + i] = imgPx[pos + i];
-			}
-			pos += pxDepth;
-		}
-		posI += pxDepth;
-		col += 1;
-		if (col >= pWidth){
-			col = 0;
-			row += 1;
-		}
+	int i, j, pos, posS, pxLen, lineLen, lineLenP;
+	UBYTE paddingColorF[4];
+	imgPad->width = img->width + (pad * 2);
+	imgPad->height = img->height + (pad * 2);
+	pxLen = 3 + (imgPad->hasAlpha = img->hasAlpha);
+	lineLen = img->width * pxLen;
+	lineLenP = imgPad->width * pxLen;
+	//copy the padding color on every pixel of the first line of the padded image
+	if (imgPad->hasAlpha){
+		memcpy(paddingColorF, paddingColor, 3);
+		paddingColorF[3] = 255; //padding colors are always fully opaque
+		ColorLine(imgPad->bA, paddingColorF, imgPad->width, 0, 0, lineLenP, 4);
+	}
+	else {
+		ColorLine(imgPad->bA, paddingColor, imgPad->width, 0, 0, lineLenP, 3);
+	}
+	//copy the first line onto all other lines to cover the entire padded image in padding color
+	pos = lineLenP;
+	for (i = 1; i < imgPad->height; i++){
+		memcpy(&imgPad->bA[pos], imgPad->bA, lineLenP);
+		pos += lineLenP;
+	}
+	//now copy the source image onto the padded image at the center
+	pos = (lineLenP + pxLen) * pad; //we start at the first pixel that isn't padding
+	posS = 0;
+	for (i = 0; i < img->height; i++){
+		memcpy(&imgPad->bA[pos], &img->bA[posS], lineLen);
+		pos += lineLenP;
+		posS += lineLen;
 	}
 }
 

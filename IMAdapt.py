@@ -55,9 +55,10 @@ class ImageModSL:
 			self.fillSquareColor = self.SL.FillSquareColor
 			self.fillSquareColor.argtypes = [POINTER(ImageData), c_int, c_int, c_int, c_int, POINTER(c_ubyte)]
 			self.fillSquareColor.restype = c_int
-			#load the build padded image function
+			#load the pad image function
 			self.padImage = self.SL.PadImage
-			self.padImage.argtypes = [POINTER(c_ubyte), POINTER(c_ubyte), c_int, c_int, c_int, c_int, POINTER(c_ubyte)]
+			self.padImage.argtypes = [POINTER(ImageData), POINTER(ImageData), c_int, POINTER(c_ubyte)]
+			self.padImage.restype = None
 			#load the crop image function
 			self.cropImage = self.SL.CropImage
 			self.cropImage.argtypes = [POINTER(c_ubyte), POINTER(c_ubyte), POINTER(c_uint32), c_int, c_int]
