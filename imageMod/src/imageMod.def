@@ -5,7 +5,7 @@ EXPORTS
 	FillSquareColor
 	PadImage
 	CopyArea
-	EraseLongSegments
+	EraseSegments
 	RemoveEmptyLines
 	PixelMatch
 	GetImagePosition

@@ -63,9 +63,10 @@ class ImageModSL:
 			self.copyArea = self.SL.CopyArea
 			self.copyArea.argtypes = [POINTER(ImageData), POINTER(ImageData), POINTER(Area)]
 			self.copyArea.restype = None
-			#load the erase long segments function
-			self.eraseLongSegments = self.SL.EraseLongSegments
-			self.eraseLongSegments.argtypes = [POINTER(c_ubyte), c_int, c_int, c_int, c_int, c_int, POINTER(c_ubyte)]
+			#load the erase segments function
+			self.eraseSegments = self.SL.EraseSegments
+			self.eraseSegments.argtypes = [POINTER(ImageData), c_int, c_int, POINTER(c_ubyte)]
+			self.eraseSegments.restype = None
 			#load the remove empty lines function
 			self.removeEmptyLines = self.SL.RemoveEmptyLines
 			self.removeEmptyLines.argtypes = [POINTER(c_ubyte), POINTER(c_ubyte), c_int, c_int, c_int, c_int, POINTER(c_ubyte)]

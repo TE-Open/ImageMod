@@ -1,6 +1,11 @@
 #include "imageMod.h"
 #include <stdlib.h>
 #include <string.h>
+//***** type definitions *****//
+typedef struct sSegment{
+	int start;
+	int length;
+} Segment;
 //constant declarations
 static UBYTE trueColor[8][3] = {{0, 0, 0}, {255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 0}, {255, 0, 255}, {0, 255, 255}, {255, 255, 255}};
 static UBYTE blackWhiteColor[2][3] = {{0, 0, 0}, {255, 255, 255}};
@@ -9,6 +14,8 @@ static inline void GetColors(UBYTE* pixel, UBYTE* red, UBYTE* green, UBYTE* blue
 static inline void CompareColor(int* minDiff, int* colorId, int newColorId, UBYTE red, UBYTE green, UBYTE blue);
 static inline void SetColor(UBYTE* pixel, UBYTE* colorArr);
 static inline int ColorLine(UBYTE* bA, UBYTE* color, int width, int top, int left, int lineLen, int pxLen);
+static inline int FindSegments(char* relArr, Segment* segArr, int dimP, int dimS, int moveP, int moveS, int maxLen);
+static inline void ClearSegments(ImageData* img, Segment* segArr, int segCount, int pxLen, int move, UBYTE* backgroundColor);
 
 void ColorReduce(ImageData* img, int blackWhite){
 	//this function takes the given pixel array, and converts each pixel into a specific color it is closest to
@@ -261,125 +268,78 @@ void CopyArea(ImageData* imgCpy, ImageData* img, Area* area){
     }
 }
 
-void EraseLongSegments(uint8_t *imgPx, int width, int height, int hasAlpha, int maxWidth, int maxHeight, uint8_t *backgroundColor){
+void EraseSegments(ImageData* img, int maxWidth, int maxHeight, UBYTE* backgroundColor){
 	//this function looks for all horizontal segments wider than the mex width and vertical segments higher than the max height and erases them
-	int pxLen = (hasAlpha)? 4 : 3;
-	int imgSize = width * height, lineLen = (width * pxLen);
-	uint8_t *relArr = (uint8_t *) malloc(imgSize);
-	int *segHArr = (int *) malloc(sizeof(int) * imgSize), *segVArr = (int *) malloc(sizeof(int) * imgSize);
-	int segHCount, segVCount;
-	int segStart, segLen;
-	int pos, posS;
-	int i, j, k;
+	char *relArr;
+	int i, pos, imgSize, pxLen, segHCount, segVCount;
+	float imgSizeF;
+	Segment *segHArr, *segVArr;
+	imgSize = img->width * img->height;
+	pxLen = 3 + img->hasAlpha;
+	relArr = (char *) malloc(imgSize);
+	imgSizeF = (float) imgSize;
+	segHArr = (Segment *) malloc(sizeof(Segment) * ((int) (imgSizeF / ((float) maxWidth)) + 1));
+	segVArr = (Segment *) malloc(sizeof(Segment) * ((int) (imgSizeF / ((float) maxHeight)) + 1));
 	//build the relevant pixel array
 	pos = 0;
 	for (i = 0; i < imgSize; i++){
-		relArr[i] = 0;
-		for (j = 0; j < 3; j++){
-			if (imgPx[pos + j] != backgroundColor[j]){
-				relArr[i] = 1;
-				break;
-			}
-		}
+		relArr[i] = ((img->bA[pos] != backgroundColor[0]) && (img->bA[pos + 1] != backgroundColor[1]) && (img->bA[pos + 2] != backgroundColor[2]));
 		pos += pxLen;
 	}
 	//go through the array and find all horizontal segments greater than the maximum width
-	segHCount = 0;
-	pos = posS = segStart = 0;
-	for (i = 0; i < height; i++){
-		segLen = 0;
-		for (j = 0; j < width; j++){
-			if (relArr[pos]){
-				//if this is a relevant pixel, add it to the segment
-				if (!segLen){
-					//if there is no started segment, we start it here
-					segStart = pos;
-				}
-				segLen++;
-			}
-			else if (segLen){
-				//if this is not a relevant pixel, and there is a segment started
-				if (segLen > maxWidth){
-					//if the length of the segment is greater than the maximum width add it to the segment array
-					segHArr[posS++] = segStart;
-					segHArr[posS++] = segLen;
-					segHCount++;
-				}
-				//in any case reset the segment length to 0
-				segLen = 0;
-			}
-			pos++;
-		}
-		//at the end of the line, check if there is a segment started and add it to the array if it fits
-		if (segLen > maxWidth){
-			segHArr[posS++] = segStart;
-			segHArr[posS++] = segLen;
-			segHCount++;
-		}
-	}
+	segHCount = FindSegments(relArr, segHArr, img->height, img->width, img->width, 1, maxWidth);
 	//go through the array and find all vertical segments greater than the maximum height
-	segVCount = 0;
-	pos = posS = segStart = 0;
-	for (i = 0; i < width; i++){
-		segLen = 0;
-		pos = i;
-		for (j = 0; j < height; j++){
-			if (relArr[pos]){
-				//if this is a relevant pixel, add it to the segment
-				if (!segLen){
-					//if there is no started segment, we start it here
-					segStart = pos;
-				}
-				segLen++;
-			}
-			else if (segLen){
-				//if this is not a relevant pixel, and there is a segment started
-				if (segLen > maxHeight){
-					//if the length of the segment is greater than the maximum height add it to the segment array
-					segVArr[posS++] = segStart;
-					segVArr[posS++] = segLen;
-					segVCount++;
-				}
-				//in any case reset the segment length to 0
-				segLen = 0;
-			}
-			pos += width;
-		}
-		//at the end of the column, check if there is a segment started and add it to the array if it fits
-		if (segLen > maxHeight){
-			segVArr[posS++] = segStart;
-			segVArr[posS++] = segLen;
-			segVCount++;
-		}
-	}
-	//erase horizontal segments (replace with background color)
-	posS = 0;
-	for (i = 0; i < segHCount; i++){
-		segStart = pos = segHArr[posS++] * pxLen;
-		segLen = segHArr[posS++];
-		for (j = 0; j < segLen; j++){
-			for (k = 0; k < pxLen; k++){
-				imgPx[pos + k] = backgroundColor[k];
-			}
-			pos += pxLen;
-		}
-	}
-	//erase vertical segments (replace with background color)
-	posS = 0;
-	for (i = 0; i < segVCount; i++){
-		segStart = pos = segVArr[posS++] * pxLen;
-		segLen = segVArr[posS++];
-		for (j = 0; j < segLen; j++){
-			for (k = 0; k < pxLen; k++){
-				imgPx[pos + k] = backgroundColor[k];
-			}
-			pos += lineLen;
-		}
-	}
+	segVCount = FindSegments(relArr, segVArr, img->width, img->height, 1, img->width, maxHeight);
+	//clear horizontal segments
+	ClearSegments(img, segHArr, segHCount, pxLen, pxLen, backgroundColor);
+	//clear vertical segments
+	ClearSegments(img, segVArr, segVCount, pxLen, (img->width * pxLen), backgroundColor);
 	//cleanup
 	free((void *) relArr);
 	free((void *) segHArr);
 	free((void *) segVArr);
+}
+
+static inline int FindSegments(char* relArr, Segment* segArr, int dimP, int dimS, int moveP, int moveS, int maxLen){
+	//this function finds segments larger than the given size in the image
+	int i, j, posS, pos, segLen, segStart, segCount;
+	posS = segStart = segCount = 0;
+	for (i = 0; i < dimP; i++){
+		pos = posS;
+		segLen = 0;
+		for (j = 0; j < dimS; j++){
+			if (relArr[pos]){
+				//if this is a relevant pixel, add it to the segment
+				if (!segLen) segStart = pos; //if there is no started segment, we start it here
+				segLen++;
+			}
+			else if (segLen){
+				//if this is not a relevant pixel, and there is a segment started, create a new segment
+				if (segLen > maxLen) segArr[segCount++] = (Segment){.start = segStart, .length = segLen};
+				//in any case reset the segment length to 0
+				segLen = 0;
+			}
+			pos += moveS;
+		}
+		//at the end of the line or column, check if there is a valid segment and add it to the array if it is
+		if (segLen > maxLen) segArr[segCount++] = (Segment){.start = segStart, .length = segLen};
+		posS += moveP;
+	}
+	return segCount;
+}
+
+static inline void ClearSegments(ImageData* img, Segment* segArr, int segCount, int pxLen, int move, UBYTE* backgroundColor){
+	//this function replaces targeted segments with supplied background color
+	int i, j, k, pos;
+	for (i = 0; i < segCount; i++){
+		pos = segArr[i].start * pxLen;
+		for (j = 0; j < segArr[i].length; j++){
+			for (k = 0; k < 3; k++){
+				img->bA[pos + k] = backgroundColor[k];
+			}
+			pos += move;
+		}
+	}
 }
 
 int RemoveEmptyLines(uint8_t *imgPx, uint8_t *imgRPx, int width, int height, int hasAlpha, int maxLines, uint8_t *backgroundColor){
