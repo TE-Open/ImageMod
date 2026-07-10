@@ -20,7 +20,7 @@ typedef struct sArea{
 } Area;
 
 //***** function prototypes *****//
-void ColorReduce(uint8_t *pixels, int pixelCount, int hasAlpha, int blackWhite);
+void ColorReduce(ImageData* img, int blackWhite);
 void SplitColor(uint8_t *pixels, int pixelCount, int hasAlpha, uint8_t *baseColor, int *threshold, int colorCount, int isBackground);
 void ColorReplace(uint8_t *pixels, int pixelCount, int hasAlpha, int ignoreAlpha, uint8_t *oldColor, uint8_t *newColor);
 int FillSquareColor(uint8_t *pixels, int width, int height, int hasAlpha, int sqx, int sqy, int sqw, int sqh, uint8_t *color);

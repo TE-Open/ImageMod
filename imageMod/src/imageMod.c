@@ -1,79 +1,84 @@
 #include "imageMod.h"
 #include <stdlib.h>
 //constant declarations
-static uint8_t trueColor[8][3] = {{0, 0, 0}, {255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 0}, {255, 0, 255}, {0, 255, 255}, {255, 255, 255}};
-static uint8_t blackWhiteColor[8][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {255, 255, 255}, {255, 255, 255}, {255, 255, 255}, {255, 255, 255}};
+static UBYTE trueColor[8][3] = {{0, 0, 0}, {255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 0}, {255, 0, 255}, {0, 255, 255}, {255, 255, 255}};
+static UBYTE blackWhiteColor[2][3] = {{0, 0, 0}, {255, 255, 255}};
+//***** Function prototypes *****//
+static inline void GetColors(UBYTE* pixel, UBYTE* red, UBYTE* green, UBYTE* blue, UBYTE* maxRed, UBYTE* maxGreen, UBYTE* maxBlue);
+static inline void CompareColor(int* minDiff, int* colorId, int newColorId, UBYTE red, UBYTE green, UBYTE blue);
+static inline void SetColor(UBYTE* pixel, UBYTE* colorArr);
 
-void ColorReduce(uint8_t *pixels, int pixelCount, int hasAlpha, int blackWhite){
+void ColorReduce(ImageData* img, int blackWhite){
 	//this function takes the given pixel array, and converts each pixel into a specific color it is closest to
-	int pxShift = (hasAlpha)? 4 : 3;
-    uint8_t red, green, blue, maxRed, maxGreen, maxBlue;
-    uint16_t minDiff, diff;
-    int colorId;
-    //the color array is dependent of whether this is black and white or not
-    uint8_t (*colorArr)[3] = (blackWhite)? blackWhiteColor : trueColor;
+	int i, pixelCount, pxLen, minDiff, colorId;
+	UBYTE red, green, blue, maxRed, maxGreen, maxBlue;
+	UBYTE* bA = img->bA;
 	//go through each pixel, and find which color is the closest
-	for (int i = 0; i < pixelCount; i++){
-		red = pixels[0];
-		green = pixels[1];
-		blue = pixels[2];
-		//get all the differences
-		maxRed = 255 - red;
-		maxGreen = 255 - green;
-		maxBlue = 255 - blue;
-		//we look for the minimum difference between each color channel of the pixel and the reference colors
-		//the first comparison is with black
-		colorId = 0;
-		minDiff = red + green + blue;
-		//the next comparison is with red
-		diff = maxRed + green + blue;
-		if (diff < minDiff){
-			minDiff = diff;
-			colorId = 1;
+	pixelCount = img->width * img->height;
+	pxLen = 3 + img->hasAlpha;
+	if (blackWhite){
+		//if this is a black and white comparison
+		for (i = 0; i < pixelCount; i++){
+			GetColors(bA, &red, &green, &blue, &maxRed, &maxGreen, &maxBlue);
+			//we look for the minimum difference between each color channel of the pixel and the reference colors
+			//by default we start with the assumption that the pixel color is black (0 red, 0 green, 0 blue)
+			colorId = 0;
+			minDiff = red + green + blue;
+			//compare it with white
+			CompareColor(&minDiff, &colorId, 1, maxRed, maxGreen, maxBlue);
+			//overwrite the pixel colors with the closest true color and shift to next pixel
+			SetColor(bA, blackWhiteColor[colorId]);
+			bA += pxLen;
 		}
-		//the next comparison is with green
-		diff = red + maxGreen + blue;
-		if (diff < minDiff){
-			minDiff = diff;
-			colorId = 2;
-		}
-		//the next comparison is with blue
-		diff = red + green + maxBlue;
-		if (diff < minDiff){
-			minDiff = diff;
-			colorId = 3;
-		}
-		//the next comparison is with yellow
-		diff = maxRed + maxGreen + blue;
-		if (diff < minDiff){
-			minDiff = diff;
-			colorId = 4;
-		}
-		//the next comparison is with purple
-		diff = maxRed + green + maxBlue;
-		if (diff < minDiff){
-			minDiff = diff;
-			colorId = 5;
-		}
-		//the next comparison is with cyan
-		diff = red + maxGreen + maxBlue;
-		if (diff < minDiff){
-			minDiff = diff;
-			colorId = 6;
-		}
-		//the last comparison is with white
-		diff = maxRed + maxGreen + maxBlue;
-		if (diff < minDiff){
-			minDiff = diff;
-			colorId = 7;
-		}
-		//overwrite the pixel colors with the closest true color
-		pixels[0] = colorArr[colorId][0];
-		pixels[1] = colorArr[colorId][1];
-		pixels[2] = colorArr[colorId][2];
-		//get to the next pixel
-		pixels += pxShift;
 	}
+	else {
+		for (i = 0; i < pixelCount; i++){
+			GetColors(bA, &red, &green, &blue, &maxRed, &maxGreen, &maxBlue);
+			//we look for the minimum difference between each color channel of the pixel and the reference colors
+			//by default we start with the assumption that the pixel color is black (0 red, 0 green, 0 blue)
+			colorId = 0;
+			minDiff = red + green + blue;
+			//compare it with all other colors to find the closest match
+			CompareColor(&minDiff, &colorId, 1, maxRed, green, blue); //red
+			CompareColor(&minDiff, &colorId, 2, red, maxGreen, blue); //green
+			CompareColor(&minDiff, &colorId, 3, red, green, maxBlue); //blue
+			CompareColor(&minDiff, &colorId, 4, maxRed, maxGreen, blue); //yellow
+			CompareColor(&minDiff, &colorId, 5, maxRed, green, maxBlue); //purple
+			CompareColor(&minDiff, &colorId, 6, red, maxGreen, maxBlue); //cyan
+			CompareColor(&minDiff, &colorId, 7, maxRed, maxGreen, maxBlue); //white
+			//overwrite the pixel colors with the closest true color and shift to next pixel
+			SetColor(bA, trueColor[colorId]);
+			bA += pxLen;
+		}
+	}
+ }
+
+static inline void GetColors(UBYTE* pixel, UBYTE* red, UBYTE* green, UBYTE* blue, UBYTE* maxRed, UBYTE* maxGreen, UBYTE* maxBlue){
+	//this function gets the colors and inverse colors for the current pixel
+	*red = pixel[0];
+	*green = pixel[1];
+	*blue = pixel[2];
+	//get all the differences
+	*maxRed = 255 - *red;
+	*maxGreen = 255 - *green;
+	*maxBlue = 255 - *blue;
+}
+
+static inline void CompareColor(int* minDiff, int* colorId, int newColorId, UBYTE red, UBYTE green, UBYTE blue){
+	//this function compare the current minimum color difference with a color difference with the given color
+	int diff = (int) (red + green + blue);
+	if (diff < *minDiff){
+		//if the new color difference is less than the prvious minimum color difference, it becomes the new minimum color difference
+		*minDiff = diff;
+		*colorId = newColorId;
+	}
+}
+
+static inline void SetColor(UBYTE* pixel, UBYTE* colorArr){
+	//this function sets the selected color in the current pixel
+	pixel[0] = colorArr[0];
+	pixel[1] = colorArr[1];
+	pixel[2] = colorArr[2];
 }
 
 void SplitColor(uint8_t *pixels, int pixelCount, int hasAlpha, uint8_t *baseColor, int *threshold, int colorCount, int isBackground){

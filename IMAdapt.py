@@ -41,7 +41,8 @@ class ImageModSL:
 		if self.isValid:
 			#load the color reduce function
 			self.colorReduce = self.SL.ColorReduce
-			self.colorReduce.argtypes = [POINTER(c_ubyte), c_int, c_int, c_int]
+			self.colorReduce.argtypes = [POINTER(ImageData), c_int]
+			self.colorReduce.restype = None
 			#load the split color function
 			self.splitColor = self.SL.SplitColor
 			self.splitColor.argtypes = [POINTER(c_ubyte), c_int, c_int, POINTER(c_ubyte), POINTER(c_int), c_int, c_int]
