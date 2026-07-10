@@ -2,6 +2,23 @@
 
 #pragma once
 #include <stdint.h>
+//***** type definitions *****//
+#define UBYTE unsigned char
+
+typedef struct sImageData{
+	UBYTE* bA; //byte array containing the image data
+	int width;
+	int height;
+	int hasAlpha;
+} ImageData;
+
+typedef struct sArea{
+	int top;
+	int bottom;
+	int left;
+	int right;
+} Area;
+
 //***** function prototypes *****//
 void ColorReduce(uint8_t *pixels, int pixelCount, int hasAlpha, int blackWhite);
 void SplitColor(uint8_t *pixels, int pixelCount, int hasAlpha, uint8_t *baseColor, int *threshold, int colorCount, int isBackground);

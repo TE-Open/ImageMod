@@ -1,7 +1,15 @@
 import os
 import pathlib
 import platform
-from ctypes import c_int, c_char, c_float, c_ubyte, c_uint32, c_int64, POINTER, CDLL
+from ctypes import Structure, c_int, c_char, c_float, c_ubyte, c_uint32, c_int64, POINTER, CDLL
+
+class ImageData(Structure):
+	#this class represents an ImageData structure in the shared library
+	_fields_ = [("bA", POINTER(c_ubyte)), ("width", c_int), ("height", c_int), ("hasAlpha", c_int)]
+
+class Area(Structure):
+	#this class represents an Area structure in the shared library
+	_fields_ = [("top", c_int), ("bottom", c_int), ("left", c_int), ("right", c_int)]
 
 class ImageModSL:
 	#this class is used to access the functions in the shared library
