@@ -8,6 +8,7 @@ static UBYTE blackWhiteColor[2][3] = {{0, 0, 0}, {255, 255, 255}};
 static inline void GetColors(UBYTE* pixel, UBYTE* red, UBYTE* green, UBYTE* blue, UBYTE* maxRed, UBYTE* maxGreen, UBYTE* maxBlue);
 static inline void CompareColor(int* minDiff, int* colorId, int newColorId, UBYTE red, UBYTE green, UBYTE blue);
 static inline void SetColor(UBYTE* pixel, UBYTE* colorArr);
+static inline int ColorLine(UBYTE* bA, UBYTE* color, int width, int top, int left, int lineLen, int pxLen);
 
 void ColorReduce(ImageData* img, int blackWhite){
 	//this function takes the given pixel array, and converts each pixel into a specific color it is closest to
@@ -157,49 +158,55 @@ void ColorReplace(ImageData* img, int ignoreAlpha, UBYTE* oldColor, UBYTE* newCo
 	}
 }
 
-int FillSquareColor(uint8_t *pixels, int width, int height, int hasAlpha, int sqx, int sqy, int sqw, int sqh, uint8_t *color){
+int FillSquareColor(ImageData* img, int sqx, int sqy, int sqw, int sqh, UBYTE *color){
 	//this function fills a square of the specified dimensions with the required color on the provided image
-	int pxLen = (hasAlpha)? 4 : 3;
-	int lineLen = (width * pxLen);
-	uint8_t colorF[pxLen];
-	int i, j, k;
-	int posPx, posStart;
+	int i, pxLen, lineLen, pos, posStart, sqr, sqb;
+	UBYTE colorF[4];
+	pxLen = 3 + img->hasAlpha;
+	lineLen = (img->width * pxLen);
 	//exit if the square location puts it outside the image
-	int sqr = sqx + sqw, sqb = sqy + sqh;
-	if ((sqx >= width) || (sqr < 0) || (sqy >= height) || (sqb < 0)) return 0; //
+	sqr = sqx + sqw;
+	sqb = sqy + sqh;
+	if ((sqx >= img->width) || (sqr < 0) || (sqy >= img->height) || (sqb < 0)) return -1;
 	//adjust the dimensions of the square if they don't fall exactly inside the image
 	if (sqx < 0){
 		sqw += sqx;
 		sqx = 0;
 	}
-	if (sqr > width){
-		sqw = width - sqx;
-	}
+	if (sqr > img->width) sqw = img->width - sqx;
 	if (sqy < 0){
 		sqh += sqy;
 		sqy = 0;
 	}
-	if (sqb > height){
-		sqh = height - sqy;
-	}
-	//initialize the color array
-	colorF[0] = color[0];
-	colorF[1] = color[1];
-	colorF[2] = color[2];
-	if (hasAlpha) colorF[3] = 255;
+	if (sqb > img->height) sqh = img->height - sqy;
 	//if the square fits, color it
-	posPx = posStart = (sqy * lineLen) + (sqx * pxLen);
-	for (i = 0; i < sqh; i++){
-		for (j = 0; j < sqw; j++){
-			for (k = 0; k < pxLen; k++){
-				pixels[posPx] = colorF[k];
-				posPx++;
-			}
-		}
-		posStart += lineLen;
-		posPx = posStart;
+	//color first line
+	if (img->hasAlpha){
+		memcpy(colorF, color, 3);
+		colorF[3] = 255;
+		posStart = ColorLine(img->bA, colorF, sqw, sqy, sqx, lineLen, 4);
 	}
-	return 1;
+	else {
+		posStart = ColorLine(img->bA, color, sqw, sqy, sqx, lineLen, 3);
+	}
+	//copy first line onto the rest
+	pos = posStart;
+	for (i = 1; i < sqh; i++){
+		pos += lineLen;
+		memcpy(&img->bA[pos], &img->bA[posStart], lineLen);
+	}
+	return 0;
+}
+
+static inline int ColorLine(UBYTE* bA, UBYTE* color, int width, int top, int left, int lineLen, int pxLen){
+	//this function colors a line of the specified width, with the specified coordinates, with the specified color
+	int i, pos, posStart;
+	pos = posStart = (top * lineLen) + (left * pxLen);
+	for (i = 0; i < width; i++){
+		memcpy(&bA[pos], color, pxLen);
+		pos += pxLen;
+	}
+	return posStart;
 }
 
 void PadImage(uint8_t *pImgPx, uint8_t *imgPx, int width, int height, int hasAlpha, int pad, uint8_t *paddingColor){

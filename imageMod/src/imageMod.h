@@ -23,7 +23,7 @@ typedef struct sArea{
 void ColorReduce(ImageData* img, int blackWhite);
 void SplitColor(ImageData* img, UBYTE* baseColor, int* threshold, int colorCount, int isBackground);
 void ColorReplace(ImageData* img, int ignoreAlpha, UBYTE* oldColor, UBYTE* newColor);
-int FillSquareColor(uint8_t *pixels, int width, int height, int hasAlpha, int sqx, int sqy, int sqw, int sqh, uint8_t *color);
+int FillSquareColor(ImageData* img, int sqx, int sqy, int sqw, int sqh, UBYTE* color);
 void PadImage(uint8_t *pImgPx, uint8_t *imgPx, int width, int height, int hasAlpha, int pad, uint8_t *paddingColor);
 void CropImage(uint8_t *imgPx, uint8_t *imgCropPx, uint32_t *rectDim, int width, int hasAlpha);
 void EraseLongSegments(uint8_t *imgPx, int width, int height, int hasAlpha, int maxWidth, int maxHeight, uint8_t *backgroundColor);

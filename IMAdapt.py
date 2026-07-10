@@ -53,7 +53,7 @@ class ImageModSL:
 			self.colorReplace.restype = None
 			#load the fill square color function
 			self.fillSquareColor = self.SL.FillSquareColor
-			self.fillSquareColor.argtypes = [POINTER(c_ubyte), c_int, c_int, c_int, c_int, c_int, c_int, c_int, POINTER(c_ubyte)]
+			self.fillSquareColor.argtypes = [POINTER(ImageData), c_int, c_int, c_int, c_int, POINTER(c_ubyte)]
 			self.fillSquareColor.restype = c_int
 			#load the build padded image function
 			self.padImage = self.SL.PadImage
