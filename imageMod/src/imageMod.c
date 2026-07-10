@@ -81,86 +81,58 @@ static inline void SetColor(UBYTE* pixel, UBYTE* colorArr){
 	pixel[2] = colorArr[2];
 }
 
-void SplitColor(uint8_t *pixels, int pixelCount, int hasAlpha, uint8_t *baseColor, int *threshold, int colorCount, int isBackground){
+void SplitColor(ImageData* img, UBYTE* baseColor, int* threshold, int colorCount, int isBackground){
 	//this function takes the given pixel array, calculate the difference of each pixel to the base color, then make the pixle black or white depending on wheteher they are above or below the average difference
 	//we need an array to store the pixel difference and a variable to store the total difference
-	uint16_t *pixDiff = (uint16_t *) malloc(sizeof(uint16_t) * pixelCount), *thrDiff = (uint16_t *) malloc(sizeof(uint16_t) * colorCount);
-	int *colIndex = (int *) malloc(sizeof(int) * colorCount), *colIndexPx = (int *) malloc(sizeof(int) * pixelCount);
-	uint64_t totalDiff = 0;
-	uint16_t diff;
-	int pxDepth = (hasAlpha)? 4 : 3;
-	uint8_t *pxPt = pixels, *colorPt;
-	uint8_t repCol, otherCol;
-	int i, j;
-	//calculate the color index for each color
-	for (i = 0; i < colorCount; i++){
-		colIndex[i] = i * 3;
-	}
+	int i, j, pixelCount, pxLen, diff, totalDiff;
+	int *pixDiff, *thrDiff, *colIndexPx;
+	UBYTE repCol, otherCol, *pxPt, *colorPt;
+	pixelCount = img->width * img->height;
+	totalDiff = 0;
+	pxLen = 3 + img->hasAlpha;
+	pixDiff = (int *) malloc(sizeof(int) * pixelCount);
+	thrDiff = (int *) malloc(sizeof(int) * colorCount);
+	colIndexPx = (int *) malloc(sizeof(int) * pixelCount);
+	pxPt = img->bA;
 	//go through each pixel, get the minimum difference to all the base colors, store it, and add it to the total
 	for (i = 0; i < pixelCount; i++){
-		pixDiff[i] = 765;
+		pixDiff[i] = 765; //this is 255 times 3, the maximum color difference possible
+		colorPt = baseColor;
 		for (j = 0; j < colorCount; j++){
-			diff = 0;
-			//get the difference for red
-			colorPt = baseColor + colIndex[j];
-			if (pxPt[0] < *colorPt){
-				diff = *colorPt - pxPt[0];
-			}
-			else {
-				diff = pxPt[0] - *colorPt;
-			}
-			//get the difference for green
-			colorPt++;
-			if (pxPt[1] < *colorPt){
-				diff += (*colorPt - pxPt[1]);
-			}
-			else {
-				diff += (pxPt[1] - *colorPt);
-			}
-			//get the difference for blue
-			colorPt++;
-			if (pxPt[2] < *colorPt){
-				diff += (*colorPt - pxPt[2]);
-			}
-			else {
-				diff += (pxPt[2] - *colorPt);
-			}
-			//check if the difference is less than the current pixel difference, and store it if it is, as well as the index of the current color
+			diff = (((pxPt[0] < colorPt[0])? (colorPt[0] - pxPt[0]) : (pxPt[0] - colorPt[0]))); //difference with red
+			diff += (((pxPt[1] < colorPt[1])? (colorPt[1] - pxPt[1]) : (pxPt[1] - colorPt[1]))); //difference with green
+			diff += (((pxPt[2] < colorPt[2])? (colorPt[2] - pxPt[2]) : (pxPt[2] - colorPt[2]))); //difference with blue
+			//check if the total difference is less than the current pixel difference, and store it if it is, as well as the index of the current color
 			if (diff < pixDiff[i]){
 				pixDiff[i] = diff;
 				colIndexPx[i] = j;
 			}
+			colorPt += 3;
 		}
 		//add to the total difference
 		totalDiff += pixDiff[i];
 		//increment pixel pointer
-		pxPt += pxDepth;
+		pxPt += pxLen;
 	}
 	//the threshold difference depends on the threshold argument
-	diff = (uint16_t) (totalDiff / (uint64_t)pixelCount); //average difference
+	diff = totalDiff / pixelCount; //average difference
 	for (i = 0; i < colorCount; i++){
-		if ((!threshold) || (threshold[i] < 0) || (threshold[i] > 765)){
-			//if the threshold for this color does not exist, or is not between the correct values, we take the average difference as the threshold
-			thrDiff[i] = diff;
-		}
-		else {
-			//otherwise we use the supplied threshold
-			thrDiff[i] = (uint16_t) threshold[i];
-		}
+		//if the threshold for this color does not exist, or is not between the correct values, we take the average difference as the threshold
+		thrDiff[i] = ((!threshold) || (threshold[i] < 0) || (threshold[i] > 765))? diff : threshold[i];
 	}
 	//go through the pixel array again, and set the pixel to black or white depending on whether its difference is greater or lesser than the threshold and the color is background
 	repCol = (isBackground)? 255 : 0; //if the colors are background the replacement color is white otherwise it is black
 	otherCol = 255 - repCol; //the other color is the inverse
+	pxPt = img->bA;
 	for (i = 0; i < pixelCount; i++){
 		//check the difference and assign the appropriate color
-		pixels[0] = pixels[1] = pixels[2] = (pixDiff[i] < thrDiff[colIndexPx[i]])? repCol : otherCol;
+		pxPt[0] = pxPt[1] = pxPt[2] = (pixDiff[i] < thrDiff[colIndexPx[i]])? repCol : otherCol;
 		//increment pixel pointer
-		pixels += pxDepth;
+		pxPt += pxLen;
 	}
 	//clean up
 	free((void *) pixDiff);
 	free((void *) thrDiff);
-	free((void *) colIndex);
 	free((void *) colIndexPx);
 }
 

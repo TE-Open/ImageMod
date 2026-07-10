@@ -1,7 +1,7 @@
 import os
 import pathlib
 import platform
-from ctypes import Structure, c_int, c_char, c_float, c_ubyte, c_uint32, c_int64, POINTER, CDLL
+from ctypes import Structure, c_int, c_float, c_ubyte, c_uint32, c_int64, POINTER, CDLL
 
 class ImageData(Structure):
 	#this class represents an ImageData structure in the shared library
@@ -45,7 +45,8 @@ class ImageModSL:
 			self.colorReduce.restype = None
 			#load the split color function
 			self.splitColor = self.SL.SplitColor
-			self.splitColor.argtypes = [POINTER(c_ubyte), c_int, c_int, POINTER(c_ubyte), POINTER(c_int), c_int, c_int]
+			self.splitColor.argtypes = [POINTER(ImageData), POINTER(c_ubyte), POINTER(c_int), c_int, c_int]
+			self.splitColor.restype = None
 			#load the color replace function
 			self.colorReplace = self.SL.ColorReplace
 			self.colorReplace.argtypes = [POINTER(c_ubyte), c_int, c_int, c_int, POINTER(c_ubyte), POINTER(c_ubyte)]
