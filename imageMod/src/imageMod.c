@@ -1,5 +1,6 @@
 #include "imageMod.h"
 #include <stdlib.h>
+#include <string.h>
 //constant declarations
 static UBYTE trueColor[8][3] = {{0, 0, 0}, {255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 0}, {255, 0, 255}, {0, 255, 255}, {255, 255, 255}};
 static UBYTE blackWhiteColor[2][3] = {{0, 0, 0}, {255, 255, 255}};
@@ -136,28 +137,23 @@ void SplitColor(ImageData* img, UBYTE* baseColor, int* threshold, int colorCount
 	free((void *) colIndexPx);
 }
 
-void ColorReplace(uint8_t *pixels, int pixelCount, int hasAlpha, int ignoreAlpha, uint8_t *oldColor, uint8_t *newColor){
-	//this function goes through every pixel in the supplied image and replace the supplied olf color with new one
-	int pxDepth = (hasAlpha)? 4 : 3, scanLen = (ignoreAlpha)? 3 : pxDepth;
-	int i, j;
-	int isOld;
-	int pos = 0;
-	for ( i = 0; i < pixelCount; i++){
-		//first check that the pixel is of the right color
-		isOld = 1;
-		for (j = 0; j < scanLen; j++){
-			if(pixels[pos + j] != oldColor[j]){
-				isOld = 0;
-				break;
-			}
+void ColorReplace(ImageData* img, int ignoreAlpha, UBYTE* oldColor, UBYTE* newColor){
+	//this function goes through every pixel in the supplied image and replace the supplied old color with new one
+	int i, pixelCount, pos, pxLen;
+	pixelCount = img->width * img->height;
+	pos = 0;
+	if (img->hasAlpha && !ignoreAlpha){
+		for ( i = 0; i < pixelCount; i++){
+			if ((img->bA[pos] == oldColor[0]) && (img->bA[pos + 1] == oldColor[1]) && (img->bA[pos + 2] == oldColor[2]) && (img->bA[pos + 3] == oldColor[3])) memcpy(&img->bA[pos], newColor, 4);
+			pos += 4;
 		}
-		//if the pixel is of the old oclor, we replace it with the new
-		if (isOld){
-			for (j = 0; j < scanLen; j++){
-				pixels[pos + j] = newColor[j];
-			}
+	}
+	else {
+		pxLen = 3 + img->hasAlpha;
+		for ( i = 0; i < pixelCount; i++){
+			if ((img->bA[pos] == oldColor[0]) && (img->bA[pos + 1] == oldColor[1]) && (img->bA[pos + 2] == oldColor[2])) memcpy(&img->bA[pos], newColor, 3);
+			pos += pxLen;
 		}
-		pos += pxDepth;
 	}
 }
 

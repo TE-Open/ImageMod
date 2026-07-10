@@ -49,7 +49,8 @@ class ImageModSL:
 			self.splitColor.restype = None
 			#load the color replace function
 			self.colorReplace = self.SL.ColorReplace
-			self.colorReplace.argtypes = [POINTER(c_ubyte), c_int, c_int, c_int, POINTER(c_ubyte), POINTER(c_ubyte)]
+			self.colorReplace.argtypes = [POINTER(ImageData), c_int, POINTER(c_ubyte), POINTER(c_ubyte)]
+			self.colorReplace.restype = None
 			#load the fill square color function
 			self.fillSquareColor = self.SL.FillSquareColor
 			self.fillSquareColor.argtypes = [POINTER(c_ubyte), c_int, c_int, c_int, c_int, c_int, c_int, c_int, POINTER(c_ubyte)]
