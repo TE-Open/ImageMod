@@ -342,47 +342,43 @@ static inline void ClearSegments(ImageData* img, Segment* segArr, int segCount, 
 	}
 }
 
-int RemoveEmptyLines(uint8_t *imgPx, uint8_t *imgRPx, int width, int height, int hasAlpha, int maxLines, uint8_t *backgroundColor){
+void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* backgroundColor){
 	//this function removes the lines in the provided image that are empty (have only pixels of the background color) after the specified maximum allowed
-	int pxDepth = (hasAlpha)? 4 : 3;
-    int lineLen = width * pxDepth;
-    int pos, posL, posR;
-    int i, j, k;
-    int emptyLines = 0, lineCount = 0, isFull;
+    int i, j, pos, posL, posR, pxLen, lineLen, lineCount, isFull;
 	//go through each line to check if the line is empty
-	posL = posR = 0;
-	for (i = 0; i < height; i++){
+	imgRm->width = img->width;
+	pxLen = 3 + (imgRm->hasAlpha = img->hasAlpha);
+	lineLen = img->width * pxLen;
+	posL = posR = lineCount = imgRm->height = 0;
+	for (i = 0; i < img->height; i++){
 		pos = posL;
-		isFull = 0;
-		for (j = 0; j < width; j++){
-			for (k = 0; k < 3; k++){
-                if (imgPx[pos + k] != backgroundColor[k]){
-					//if the pixel differs from the background color in any color channel, the line is not empty, and we move on
-					isFull = 1;
-					break;
-                }
+		for (j = 0; j < img->width; j++){
+			//check for each pîxel in the line if the pixel color differs in any channel from the background color
+			if (isFull = ((img->bA[pos] != backgroundColor[0]) || (img->bA[pos + 1] != backgroundColor[1]) || (img->bA[pos + 2] != backgroundColor[2]))) break; //if it does, the line is not empty, move on
+			pos += pxLen;
+		}
+		//if the current line is not empty, we must copy lines
+		if (isFull){
+			if ((lineCount > 1) && (lineCount <= maxLines)){
+				//if the number of empty lines is less than the maximum allowed, copy them as well as the current line
+				pos = posL - ((lineCount - 1) * lineLen);
 			}
-			//if the pixel is not empty, the line is not empty, move on
-			if (isFull)
-				break;
-			pos += pxDepth;
-		}
-		//if the line is full, or it is not but the empty lines counter is below the required threshold, copy the image to the buffer
-		if (isFull || (emptyLines < maxLines)){
-			for (j = 0; j < lineLen; j++){
-				imgRPx[posR++] = imgPx[posL++];
+			else {
+				//otherwise copy only the current line
+				lineCount = 1;
+				pos = posL;
 			}
-			lineCount += 1;
+			for (j = 0; j < lineCount; j++){
+				memcpy(&imgRm->bA[posR], &img->bA[pos], lineLen);
+				posR += lineLen;
+				pos += lineLen;
+				imgRm->height++;
+			}
+			lineCount = 0;
 		}
-		else {
-			//otherwise we simply move the starting position to the next line
-			posL += lineLen;
-		}
-		//if the line is not full add one to the empty line ocunter otherwise set it to 0
-		emptyLines = (isFull)? 0 : (emptyLines + 1);
+		lineCount++;
+		posL += lineLen;
 	}
-	//return the line count
-	return lineCount;
 }
 
 float PixelMatch(uint8_t *smlImgPx, uint8_t *bigImgPx, int widthS, int heightS, int hasAlphaS, int widthB, int heightB, int hasAlphaB, int ignoreAlpha){

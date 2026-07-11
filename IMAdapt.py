@@ -69,8 +69,8 @@ class ImageModSL:
 			self.eraseSegments.restype = None
 			#load the remove empty lines function
 			self.removeEmptyLines = self.SL.RemoveEmptyLines
-			self.removeEmptyLines.argtypes = [POINTER(c_ubyte), POINTER(c_ubyte), c_int, c_int, c_int, c_int, POINTER(c_ubyte)]
-			self.removeEmptyLines.restype = c_int
+			self.removeEmptyLines.argtypes = [POINTER(ImageData), POINTER(ImageData), c_int, POINTER(c_ubyte)]
+			self.removeEmptyLines.restype = None
 			#load the pixel match function
 			self.pixelMatch = self.SL.PixelMatch
 			self.pixelMatch.argtypes = [POINTER(c_ubyte), POINTER(c_ubyte), c_int, c_int, c_int, c_int, c_int, c_int, c_int]
