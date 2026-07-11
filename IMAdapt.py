@@ -73,7 +73,7 @@ class ImageModSL:
 			self.removeEmptyLines.restype = None
 			#load the pixel match function
 			self.pixelMatch = self.SL.PixelMatch
-			self.pixelMatch.argtypes = [POINTER(c_ubyte), POINTER(c_ubyte), c_int, c_int, c_int, c_int, c_int, c_int, c_int]
+			self.pixelMatch.argtypes = [POINTER(ImageData), POINTER(ImageData), c_int]
 			self.pixelMatch.restype = c_float
 			#load the get image position function
 			self.getImagePosition = self.SL.GetImagePosition

@@ -28,7 +28,7 @@ void PadImage(ImageData* imgPad, ImageData* img, int pad, UBYTE* paddingColor);
 void CopyArea(ImageData* imgCpy, ImageData* img, Area* area);
 void EraseSegments(ImageData* img, int maxWidth, int maxHeight, UBYTE* backgroundColor);
 void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* backgroundColor);
-float PixelMatch(uint8_t *smlImgPx, uint8_t *bigImgPx, int widthS, int heightS, int hasAlphaS, int widthB, int heightB, int hasAlphaB, int ignoreAlpha);
+float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha);
 int GetImagePosition(uint8_t *smlImgPx, uint8_t *bigImgPx, int *matchData, int widthS, int heightS, int hasAlphaS, int widthB, int heightB, int hasAlphaB, int ignoreAlpha, float precision, int bestMatch, int merge);
 void GetRelevantRectangle(uint8_t *imgPx, uint32_t *rectDim, int width, int height, int hasAlpha, uint8_t *backgroundColor);
 int GetElementList(uint8_t *imgPx, int *elDim, int width, int height, int hasAlpha, uint8_t *backgroundColor, int dimH, int dimV);

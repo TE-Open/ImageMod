@@ -16,6 +16,7 @@ static inline void SetColor(UBYTE* pixel, UBYTE* colorArr);
 static inline int ColorLine(UBYTE* bA, UBYTE* color, int width, int top, int left, int lineLen, int pxLen);
 static inline int FindSegments(char* relArr, Segment* segArr, int dimP, int dimS, int moveP, int moveS, int maxLen);
 static inline void ClearSegments(ImageData* img, Segment* segArr, int segCount, int pxLen, int move, UBYTE* backgroundColor);
+static inline void BuildPixelArray(ImageData* img, uint32_t *pxArr, int ignoreAlpha);
 
 void ColorReduce(ImageData* img, int blackWhite){
 	//this function takes the given pixel array, and converts each pixel into a specific color it is closest to
@@ -381,74 +382,71 @@ void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* bac
 	}
 }
 
-float PixelMatch(uint8_t *smlImgPx, uint8_t *bigImgPx, int widthS, int heightS, int hasAlphaS, int widthB, int heightB, int hasAlphaB, int ignoreAlpha){
-	//this function checks the small and big pictures and returns the percentage of pixels that match for the best match
-	//check that the small image is smaller in width and height ahn the big image
-	if ((widthS > widthB) || (heightS > heightB))
-		return 0;
-	//build the pixel grids
-	int i, j;
-	int pxCountS = widthS * heightS, pxCountB = widthB * heightB;
-	int pxCount[] = {pxCountS, pxCountB}, hasAlpha[] = {hasAlphaS, hasAlphaB}, pxDepth[] = {(hasAlphaS)? 4 : 3, (hasAlphaB)? 4 : 3};
-	uint8_t *imgPx[] = {smlImgPx, bigImgPx};
-	uint32_t *pxGridS = (uint32_t *) malloc(sizeof(uint32_t) * pxCountS), *pxGridB = (uint32_t *) malloc(sizeof(uint32_t) * pxCountB);
-	uint32_t *pxGrid[] = {pxGridS, pxGridB};
-	for (i = 0; i < 2; i++){
-		if (hasAlpha[i] && !ignoreAlpha){
-			for (j = 0; j < pxCount[i]; j++){
-				pxGrid[i][j] = (((uint32_t) imgPx[i][0]) << 24) | (((uint32_t) imgPx[i][1]) << 16) | (((uint32_t) imgPx[i][2]) << 8) | ((uint32_t) imgPx[i][3]);
-				imgPx[i] += pxDepth[i];
-			}
-		}
-		else {
-			for (j = 0; j < pxCount[i]; j++){
-				pxGrid[i][j] = (((uint32_t) imgPx[i][0]) << 24) | (((uint32_t) imgPx[i][1]) << 16) | (((uint32_t) imgPx[i][2]) << 8) | 0xFF;
-				imgPx[i] += pxDepth[i];
-			}
-		}
-	}
-	//get the number of possible position that the small image can fir in the large one
-	int maxPosH = (widthB - widthS + 1), posCount = maxPosH * (heightB - heightS + 1);
-	int posB = 0, colB = 0, pos = 0, posS, colS;
-	int matchPx, matchPxAll = 0;
-	int betterMatch;
+float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha){
+	//this function checks the small and big images and returns the percentage of pixels that match for the best match
+	int i, j, k, pos, posS, posB, colB, pxCount, lineJump, maxPosH, posCount, matchScore, matchScoreBest;
+	uint32_t *pxArrSml, *pxArrBig;
+	//check that the small image is smaller in width and height than the big image
+	if ((imgSml->width > imgBig->width) || (imgSml->height > imgBig->height)) return 0;
+	//to speed up the comparisons, build an array of 32 bit integers representing the pixels for both images
+	pxCount = (imgSml->width * imgSml->height);
+	pxArrSml = (uint32_t *) malloc(sizeof(uint32_t) * pxCount);
+	BuildPixelArray(imgSml, pxArrSml, ignoreAlpha);
+	pxArrBig = (uint32_t *) malloc(sizeof(uint32_t) * (imgBig->width * imgBig->height));
+	BuildPixelArray(imgBig, pxArrBig, ignoreAlpha);
+	//get the number of possible positions that the small image can fit into the large one
+	lineJump = imgBig->width - imgSml->width;
+	maxPosH = lineJump + 1;
+	posCount = maxPosH * (imgBig->height - imgSml->height + 1);
+	posB = colB = matchScoreBest = 0;
 	for (i = 0; i < posCount; i++){
-		posS = pos;
-		j = colS = 0;
-		matchPx = pxCountS;
-		betterMatch = 1;
-		while (j < pxCountS){
-			matchPx -= (pxGridB[posS + colS] != pxGridS[j]);
-			if (matchPx < matchPxAll){
-				betterMatch = 0;
-				break;
+		posS = 0;
+		pos = posB + colB;
+		matchScore = pxCount;
+		for (j = 0; j < imgSml->height; j++){
+			for (k = 0; k < imgSml->width; k++){
+				//remove one from the match score for each pixel that doesn't match
+				matchScore -= (pxArrBig[pos++] != pxArrSml[posS++]);
 			}
-			j++;
-			colS++;
-			if (colS >= widthS){
-				//if the pixel column is greater than the width of the small image, it is on the next row, and we must increment the position of the big picture by a row
-				posS += widthB;
-				colS = 0;
-			}
+			if (matchScore < matchScoreBest) break;
+			pos += lineJump; //move to the next line in the big image
 		}
 		//check if it's a better match and assign it if it is
-		if (betterMatch) matchPxAll = matchPx;
+		if (matchScore > matchScoreBest) matchScoreBest = matchScore;
 		//change the match position
 		colB++;
 		if (colB >= maxPosH){
 			//reset the column and change the position if the small image position column is above the maximum possible horizontal positions
 			colB = 0;
-			posB += widthB;
-			pos = posB;
-		}
-		else {
-			pos++;
+			posB += imgBig->width;
 		}
 	}
 	//cleanup and return the match value
-	free((void *) pxGridS);
-	free((void *) pxGridB);
-	return ((float) matchPxAll / (float) pxCountS);
+	free((void *) pxArrSml);
+	free((void *) pxArrBig);
+	return ((float) matchScoreBest / (float) pxCount);
+}
+
+static inline void BuildPixelArray(ImageData* img, uint32_t *pxArr, int ignoreAlpha){
+	//this function build the 32 bit pixel array associated with the given image
+	int i, pos, pxLen, pxCount;
+	if (img->hasAlpha && !ignoreAlpha){
+		//if the image has an alpha channel (and therefore is already 32 bit), and the alpha channel is not ignored, simply copy it
+		memcpy((char *) pxArr, img->bA, (img->width * img->height * 4));
+	}
+	else {
+		//if the image does not have an alpha channel, or it is ignored in the comparison, copy the red, green, and blue channels to the pixel array and set the transparency channel to zero
+		pxLen = 3 + img->hasAlpha;
+		pxCount = img->width * img->height;
+		memset((char *) pxArr, 0, (pxCount * pxLen)); //set all bytes to zero
+		pos = 0;
+		for (i = 0; i < pxCount; i++){
+			//copy the red, green, and blue channels
+			memcpy((char *) pxArr, &img->bA[pos], 3);
+			pos += pxLen;
+			pxArr++;
+		}
+	}
 }
 
 int GetImagePosition(uint8_t *smlImgPx, uint8_t *bigImgPx, int *matchData, int widthS, int heightS, int hasAlphaS, int widthB, int heightB, int hasAlphaB, int ignoreAlpha, float precision, int bestMatch, int merge){
