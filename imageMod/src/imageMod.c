@@ -579,119 +579,109 @@ void GetRelevantArea(ImageData* img, Area* area, UBYTE* backgroundColor){
 	}
 }
 
-int GetElementList(uint8_t *imgPx, int *elDim, int width, int height, int hasAlpha, uint8_t *backgroundColor, int dimH, int dimV){
+int GetElementList(ImageData* img, Area* elList, UBYTE* backgroundColor, int dimH, int dimV){
 	//this function goes through each pixel in the image and creates elements to group them together
-	int pxLen = (hasAlpha)? 4 : 3;
-	int imgSize = width * height;
-	uint8_t *relArr = (uint8_t *) malloc(imgSize);
-	int elCount = 0;
-	int i, j, k, l, m;
-	int left, right, top, bottom, mLeft[8], mRight[8], mTop[8], mBottom[8];
-	//the search margins have directions associated with them, which are communicated with masks with top = 1, right = 2, bottom = 4, left = 8
-	// |  9 | 1 | 3 |
-	// |  8 |   | 2 |
-	// | 12 | 4 | 6 |
-	int mMask[] = {9, 1, 3, 8, 2, 12, 4, 6}; //this is the margin mask array
-	int lineJump, posSEl, pxFound, pxFoundNew;
-	int pos = 0, posEl;
-	//build the relevant pixel array
-	for (i = 0; i < imgSize; i++){
-		relArr[i] = 0;
-		for (j = 0; j < 3; j++){
-			if (imgPx[pos + j] != backgroundColor[j]){
-				relArr[i] = 1;
-				break;
-			}
-		}
+	int i, j, k, l, posP, pos, posC, pxLen, pixelCount, pxFound, elCount, len, maxH, maxV;
+	char *relPx, *zeroPx;
+	Area searchArea;
+	//build the relevant pixel array (pixels with a color different than the background)
+	pxLen = 3 + img->hasAlpha;
+	pixelCount = img->width * img->height;
+	relPx = malloc(pixelCount);
+	pos = 0;
+	for (i = 0; i < pixelCount; i++){
+		relPx[i] = ((img->bA[pos] != backgroundColor[0]) || (img->bA[pos + 1] != backgroundColor[1]) || (img->bA[pos + 2] != backgroundColor[2]));
 		pos += pxLen;
 	}
 	//go through the relevant pixel array and create elements for each sets of pixels separated by less than the defined pad values
-	pos = posEl = 0;
-	for (i = 0; i < height; i++){
-		for (j = 0; j < width; j++){
+	elCount = 0;
+	maxH = img->width - 1;
+	maxV = img->height - 1;
+	zeroPx = malloc(img->width); //this is a comparison array for horizontal pixel checks
+	memset(zeroPx, 0, img->width);
+	posP = 0;
+	for (i = 0; i < img->height; i++){
+		for (j = 0; j < img->width; j++){
 			//if the current pixel is relevant, create a new element
-			if (relArr[pos]){
-				relArr[pos] = 0; //turn off the pixel, now that it has been used
-				//store the initial dimensions of hte element (one pixel)
-				elDim[posEl] = j;
-				elDim[posEl + 1] = j + 1;
-				elDim[posEl + 2] = i;
-				elDim[posEl + 3] = i + 1;
+			if (relPx[posP++]){
+				//store the initial dimensions of the element (one pixel)
+				elList[elCount] = (Area) {.top = i, .bottom = i, .left = j, .right = j};
 				//loop until no pixel can be found in the search area
-				pxFoundNew = 15;
-				while (pxFoundNew){
-					pxFound = pxFoundNew;
-					pxFoundNew = 0;
-					//get the dimensions of the maximum search box
-					left = elDim[posEl] - dimH;
-					if (left < 0)
-						left = 0;
-					right = elDim[posEl + 1] + dimH;
-					if (right > width)
-						right = width;
-					top = elDim[posEl + 2] - dimV;
-					if (top < 0)
-						top = 0;
-					bottom = elDim[posEl + 3] + dimV;
-					if (bottom > height)
-						bottom = height;
-					//get the dimensions of the search margins
-					//the search margins are arranged in this manner around the element:
-					// | 0 | 1 | 2 |
-					// | 3 |   | 4 |
-					// | 5 | 6 | 7 |
-					//get the horizontal dimensions
-					mLeft[0] = mLeft[3] = mLeft[5] = left;
-					mRight[0] = mRight[3] = mRight[5] = mLeft[1] = mLeft[6] = elDim[posEl];
-					mRight[1] = mRight[6] = mLeft[2] = mLeft[4] = mLeft[7] = elDim[posEl + 1];
-					mRight[2] = mRight[4] = mRight[7] = right;
-					//get the vertical dimensions
-					mTop[0] = mTop[1] = mTop[2] = top;
-					mBottom[0] = mBottom[1] = mBottom[2] = mTop[3] = mTop[4] = elDim[posEl + 2];
-					mBottom[3] = mBottom[4] = mTop[5] = mTop[6] = mTop[7] = elDim[posEl + 3];
-					mBottom[5] = mBottom[6] = mBottom[7] = bottom;
-					//search for a valid pixel in each active search margin
-					for (k = 0; k < 8; k++){
-						//an area is active if a pixel was found there last round
-						if (pxFound & mMask[k]){
-							//get the dimensions of the line jump and the starting position of the search pixel
-							lineJump = (width - mRight[k]) + mLeft[k];
-							posSEl = (mTop[k] * width) + mLeft[k];
-							for (l = mTop[k]; l < mBottom[k]; l++){
-								for (m = mLeft[k]; m < mRight[k]; m++){
-									if (relArr[posSEl]){
-										//if we find an active pixel in the seacrh area, we check to see if it is beyond the current borders of the element, and update them if it is
-										relArr[posSEl] = 0; //turn off the pixel, now that it has been used
-										pxFoundNew |= mMask[k]; //indicate in which margin the pixel was found
-										if (m < elDim[posEl]){
-											elDim[posEl] = m;
-										}
-										else if (m >= elDim[posEl + 1]){
-											elDim[posEl + 1] = m + 1;
-										}
-										if (l < elDim[posEl + 2]){
-											elDim[posEl + 2] = l;
-										}
-										else if (l >= elDim[posEl + 3]){
-											elDim[posEl + 3] = l + 1;
-										}
-									}
-									posSEl++;
-								}
-								posSEl += lineJump;
+				pxFound = 1;
+				searchArea = (Area) {.top = elList[elCount].top - dimV, .bottom = elList[elCount].bottom + dimV , .left = elList[elCount].left - dimH, .right = elList[elCount].right + dimH};
+				if (searchArea.top < 0) searchArea.top = 0;
+				if (searchArea.bottom > maxV) searchArea.bottom = maxV;
+				if (searchArea.left < 0) searchArea.left = 0;
+				if (searchArea.right > maxH) searchArea.right = maxH;
+				while (pxFound){
+					//we search for relevant pixels by looking at the areas beneath and to the side of the current element in a clockwise direction
+					pxFound = 0;
+					//search the right area
+					posC = pos = (searchArea.top * img->width) + (searchArea.right);
+					for (k = searchArea.right; k > elList[elCount].right; k--){
+						for (l = searchArea.top; l <= searchArea.bottom; l++){
+							if (relPx[pos]){
+								//if there was a relevant pixel found in the area, set the current element right to it, update the search area
+								elList[elCount].right = k;
+								searchArea.right = k + dimH;
+								if (searchArea.right > maxH) searchArea.right = maxH;
+								pxFound = 1;
+								goto IM_GEL_RIGHT_END;
 							}
+							pos += img->width;
 						}
+						posC--;
+						pos = posC;
 					}
+					IM_GEL_RIGHT_END:
+					//search the bottom area
+					len = searchArea.right - searchArea.left + 1;
+					pos = (searchArea.bottom * img->width) + searchArea.left;
+					for (k = searchArea.bottom; k > elList[elCount].bottom; k--){
+						if (memcmp(&relPx[pos], zeroPx, len)){
+							//if the current line is not all zeros, set the current element bottom to it, set the new search area, update the search area
+							elList[elCount].bottom = k;
+							searchArea.bottom = k + dimV;
+							if (searchArea.bottom > maxV) searchArea.bottom = maxV;
+							pxFound = 1;
+							break;
+						}
+						pos -= img->width;
+					}
+					//search the left area if active
+					posC = pos = (searchArea.top * img->width) + (searchArea.left);
+					for (k = searchArea.left; k < elList[elCount].left; k++){
+						for (l = searchArea.top; l <= searchArea.bottom; l++){
+							if (relPx[pos]){
+								//if there was a relevant pixel found in the area, set the current element left to it, update the search area
+								elList[elCount].left = k;
+								searchArea.left = k - dimH;
+								if (searchArea.left < 0) searchArea.left = 0;
+								pxFound = 1;
+								goto IM_GEL_LEFT_END;
+							}
+							pos += img->width;
+						}
+						posC++;
+						pos = posC;
+					}
+					IM_GEL_LEFT_END:
 				}
-				//increment element position tracker and element count
-				posEl += 4;
+				//set all pixels in the element to zero as they are no longer relevant
+				len = elList[elCount].right - elList[elCount].left + 1;
+				pos = (elList[elCount].top * img->width) + elList[elCount].left;
+				for (k = elList[elCount].top; k <= elList[elCount].bottom; k++){
+					memset(&relPx[pos], 0, len);
+					pos += img->width;
+				}
+				//increment element count
 				elCount++;
 			}
-			pos++;
 		}
 	}
 	//cleanup
-	free((void *) relArr);
+	free((void *) relPx);
+	free((void *) zeroPx);
 	//return the element count
 	return elCount;
 }

@@ -1,7 +1,8 @@
 import os
 import pathlib
 import platform
-from ctypes import Structure, c_int, c_float, c_ubyte, c_uint32, c_int64, POINTER, CDLL
+
+from ctypes import Structure, c_int, c_ubyte, c_float, POINTER, CDLL
 
 class ImageData(Structure):
 	#this class represents an ImageData structure in the shared library
@@ -89,5 +90,5 @@ class ImageModSL:
 			self.getRelevantArea.restype = None
 			#load the get element list function
 			self.getElementList = self.SL.GetElementList
-			self.getElementList.argtypes = [POINTER(c_ubyte), POINTER(c_int), c_int, c_int, c_int, POINTER(c_ubyte), c_int, c_int]
+			self.getElementList.argtypes = [POINTER(ImageData), POINTER(Area), POINTER(c_ubyte), c_int, c_int]
 			self.getElementList.restype = c_int

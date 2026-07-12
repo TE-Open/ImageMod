@@ -36,4 +36,4 @@ void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* bac
 float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha);
 int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData, int ignoreAlpha, float precision, int bestMatch, int merge);
 void GetRelevantArea(ImageData* img, Area* area, UBYTE* backgroundColor);
-int GetElementList(uint8_t *imgPx, int *elDim, int width, int height, int hasAlpha, uint8_t *backgroundColor, int dimH, int dimV);
+int GetElementList(ImageData* img, Area* elList, UBYTE* backgroundColor, int dimH, int dimV);
