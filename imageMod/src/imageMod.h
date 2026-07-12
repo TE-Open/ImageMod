@@ -19,6 +19,11 @@ typedef struct sArea{
 	int right;
 } Area;
 
+typedef struct sMatchData{
+	Area a;
+	float matchP; //match percentage
+} MatchData;
+
 //***** function prototypes *****//
 void ColorReduce(ImageData* img, int blackWhite);
 void SplitColor(ImageData* img, UBYTE* baseColor, int* threshold, int colorCount, int isBackground);
@@ -29,6 +34,6 @@ void CopyArea(ImageData* imgCpy, ImageData* img, Area* area);
 void EraseSegments(ImageData* img, int maxWidth, int maxHeight, UBYTE* backgroundColor);
 void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* backgroundColor);
 float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha);
-int GetImagePosition(uint8_t *smlImgPx, uint8_t *bigImgPx, int *matchData, int widthS, int heightS, int hasAlphaS, int widthB, int heightB, int hasAlphaB, int ignoreAlpha, float precision, int bestMatch, int merge);
+int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData, int ignoreAlpha, float precision, int bestMatch, int merge);
 void GetRelevantRectangle(uint8_t *imgPx, uint32_t *rectDim, int width, int height, int hasAlpha, uint8_t *backgroundColor);
 int GetElementList(uint8_t *imgPx, int *elDim, int width, int height, int hasAlpha, uint8_t *backgroundColor, int dimH, int dimV);

@@ -17,6 +17,8 @@ static inline int ColorLine(UBYTE* bA, UBYTE* color, int width, int top, int lef
 static inline int FindSegments(char* relArr, Segment* segArr, int dimP, int dimS, int moveP, int moveS, int maxLen);
 static inline void ClearSegments(ImageData* img, Segment* segArr, int segCount, int pxLen, int move, UBYTE* backgroundColor);
 static inline void BuildPixelArray(ImageData* img, uint32_t *pxArr, int ignoreAlpha);
+static inline int CheckMatch(uint32_t *pxArrA, uint32_t *pxArrB, int matchScore, int posStart, int height, int width, int threshold, int lineJump);
+static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, int posChange);
 
 void ColorReduce(ImageData* img, int blackWhite){
 	//this function takes the given pixel array, and converts each pixel into a specific color it is closest to
@@ -384,7 +386,7 @@ void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* bac
 
 float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha){
 	//this function checks the small and big images and returns the percentage of pixels that match for the best match
-	int i, j, k, pos, posS, posB, colB, pxCount, lineJump, maxPosH, posCount, matchScore, matchScoreBest;
+	int i, pos, posB, colB, pxCount, lineJump, maxPosH, posCount, matchScore, matchScoreBest;
 	uint32_t *pxArrSml, *pxArrBig;
 	//check that the small image is smaller in width and height than the big image
 	if ((imgSml->width > imgBig->width) || (imgSml->height > imgBig->height)) return 0;
@@ -400,17 +402,7 @@ float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha){
 	posCount = maxPosH * (imgBig->height - imgSml->height + 1);
 	posB = colB = matchScoreBest = 0;
 	for (i = 0; i < posCount; i++){
-		posS = 0;
-		pos = posB + colB;
-		matchScore = pxCount;
-		for (j = 0; j < imgSml->height; j++){
-			for (k = 0; k < imgSml->width; k++){
-				//remove one from the match score for each pixel that doesn't match
-				matchScore -= (pxArrBig[pos++] != pxArrSml[posS++]);
-			}
-			if (matchScore < matchScoreBest) break;
-			pos += lineJump; //move to the next line in the big image
-		}
+		matchScore = CheckMatch(pxArrBig, pxArrSml, pxCount, posB + colB, imgSml->height, imgSml->width, matchScoreBest, lineJump);
 		//check if it's a better match and assign it if it is
 		if (matchScore > matchScoreBest) matchScoreBest = matchScore;
 		//change the match position
@@ -449,397 +441,120 @@ static inline void BuildPixelArray(ImageData* img, uint32_t *pxArr, int ignoreAl
 	}
 }
 
-int GetImagePosition(uint8_t *smlImgPx, uint8_t *bigImgPx, int *matchData, int widthS, int heightS, int hasAlphaS, int widthB, int heightB, int hasAlphaB, int ignoreAlpha, float precision, int bestMatch, int merge){
+static inline int CheckMatch(uint32_t *pxArrA, uint32_t *pxArrB, int matchScore, int posStart, int height, int width, int threshold, int lineJump){
+	//this function checks how often two pixel arrays match and returns if it goes below a threshold
+	int i, j, posA, posB;
+	posA = posStart;
+	posB = 0;
+	for (i = 0; i < height; i++){
+		for (j = 0; j < width; j++){
+			//remove one from the match score for each pixel that doesn't match
+			matchScore -= (pxArrA[posA++] != pxArrB[posB++]);
+		}
+		if (matchScore < threshold) break; //if the match score is below the threshold, exit
+		posA += lineJump; //move to the next line in the big image
+	}
+	return matchScore;
+}
+
+int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData, int ignoreAlpha, float precision, int bestMatch, int merge){
 	//this function tries to find the small image in the big image with the given precision (percentage of matching pixels)
-	int i, j, k, l, m, maxPosH, posCount, posB, colB, lineB, pos, posS, posM, lenT, lenC, movTC, movTL, posT, posTL, jumpPS, jumpPB, movPS, movPB, lenP, movOS, movOB, lenO, lenR, posAS, posAB, posCS, posCB;
-	int matchPx, matchPxAll, matchPxMin, matchCount, isMatch;
-	int pxCountS, pxCountB, pxDepthS, pxDepthB, useAlphaS, useAlphaB;
-	int *widthT, *heightT, *widthTC, *heightTC, widthLenT, heightLenT;
-	int colorCount, colorFound, colorPixelCount[20], colorPixelCountC[21], changeCount, changeCountH, changeCountBuf, *changeArr;
-	int *mergeMatchData, mergeMatchCount;
-	float adjPrec;
-	uint32_t colorArr[30], pixel;
-	uint8_t *pxGridS, *pxGridB, pxPrev;
+	int i, j, posB, colB, lineB, pxCount, lineJump, maxPosH, posCount, matchScore, threshold, matchCount, mergeMatchCount, widthAdj, heightAdj, isMatch;
+	MatchData *mergeMatchData;
+	float pxCountF;
+	uint32_t *pxArrSml, *pxArrBig;
 	//check that the small image is smaller in width and height than the big image
-	if ((widthS > widthB) || (heightS > heightB))
-		return 0;
-	//build the pixel grids
-	pxCountS = widthS * heightS, pxCountB = widthB * heightB;
-	pxDepthS = (hasAlphaS)? 4 : 3;
-	pxDepthB = (hasAlphaB)? 4 : 3;
-	useAlphaS = (hasAlphaS && !ignoreAlpha);
-	useAlphaB = (hasAlphaB && !ignoreAlpha);
-	pxGridS = (uint8_t *) malloc(sizeof(uint8_t) * pxCountS);
-	pxGridB = (uint8_t *) malloc(sizeof(uint8_t) * pxCountB);
-	//first go though the small image and make a list of colors (20 at most)
-	colorCount = 1;
-	colorArr[0] = (((uint32_t) smlImgPx[0]) << 24) | (((uint32_t) smlImgPx[1]) << 16) | (((uint32_t) smlImgPx[2]) << 8) | ((useAlphaS)? ((uint32_t) smlImgPx[3]) : 0xFF);
-	colorPixelCount[0] = 1;
-	pxGridS[0] = 0;
-	smlImgPx += pxDepthS;
-	for (i = 1; i < pxCountS; i++){
-		pixel = (((uint32_t) smlImgPx[0]) << 24) | (((uint32_t) smlImgPx[1]) << 16) | (((uint32_t) smlImgPx[2]) << 8) | ((useAlphaS)? ((uint32_t) smlImgPx[3]) : 0xFF);
-		//check that the current pixel has a known color
-		colorFound = 0;
-		for (j = 0; j < colorCount; j++){
-			if (pixel == colorArr[j]){
-				//if the pixel is a known color increment the color pixel counter for that color, and put it in the pixel grid
-				colorFound = 1;
-				colorPixelCount[j]++;
-				pxGridS[i] = j;
-				break;
+	if ((imgSml->width > imgBig->width) || (imgSml->height > imgBig->height)) return 0;
+	//to speed up the search, build an array of 32 bit inetegers representing the pixels for both images
+	pxCount = (imgSml->width * imgSml->height);
+	pxCountF = (float) pxCount;
+	pxArrSml = (uint32_t *) malloc(sizeof(uint32_t) * pxCount);
+	BuildPixelArray(imgSml, pxArrSml, ignoreAlpha);
+	pxArrBig = (uint32_t *) malloc(sizeof(uint32_t) * (imgBig->width * imgBig->height));
+	BuildPixelArray(imgBig, pxArrBig, ignoreAlpha);
+	//whether we add the matches up or remove the misses from the maximum is dependent on the required precision and whether this is a best only match
+	lineJump = imgBig->width - imgSml->width;
+	maxPosH = lineJump + 1;
+	posCount = maxPosH * (imgBig->height - imgSml->height + 1);
+	matchCount = posB = colB = lineB = 0;
+	if (bestMatch){
+		//if this is a best match search, the threshold is the currenct best match score
+		threshold = 0;
+		for (i = 0; i < posCount; i++){
+			matchScore = CheckMatch(pxArrBig, pxArrSml, pxCount, posB + colB, imgSml->height, imgSml->width, threshold, lineJump);
+			//check if it's a better match
+			if (matchScore > threshold){
+				//if it is record it, and record the position and match percentage
+				threshold = matchScore;
+				matchCount = 1;
+				matchData[0] = (MatchData){.a.top = lineB, .a.bottom = 0, .a.left = colB, .a.right = 0, .matchP = (float) matchScore / pxCountF};
 			}
+			//change the search position
+			MoveSearchColumn(&colB, &lineB, &posB, maxPosH, imgBig->width);
 		}
-		//if the color is not yet known, add it to the color array if there is space remaining
-		if (!colorFound){
-			if (colorCount < 20){
-				colorArr[colorCount] = pixel;
-				colorPixelCount[colorCount] = 1;
-				pxGridS[i] = colorCount;
-				colorCount++;
-			}
-			else {
-				pxGridS[i] = 20;
-			}
-		}
-		smlImgPx += pxDepthS;
-	}
-	//now that the color array is done, create the pixel grid for the big image
-	for (i = 0; i < pxCountB; i++){
-		pixel = (((uint32_t) bigImgPx[0]) << 24) | (((uint32_t) bigImgPx[1]) << 16) | (((uint32_t) bigImgPx[2]) << 8) | ((useAlphaB)? ((uint32_t) bigImgPx[3]) : 0xFF);
-		//check that the current pixel has a known color
-		colorFound = 0;
-		for (j = 0; j < colorCount; j++){
-			if (pixel == colorArr[j]){
-				//if the pixel is a known color, put it in the big pixel grid
-				colorFound = 1;
-				pxGridB[i] = j;
-				break;
-			}
-		}
-		//if the color was not found, put a -1 in the pixel grid
-		if (!colorFound) pxGridB[i] = 20;
-		bigImgPx += pxDepthB;
-	}
-	//calculate the scanning direction and starting position with the greatest distinctiveness, to speed up the image matching process
-	//start with the horizontal scanning
-	posS = 0;
-	changeArr = (int *) malloc(sizeof(int) * heightS);
-	for (i = 0; i < heightS; i++){
-		//for each line of the small image, count up how often the color changes
-		pos = posS;
-		changeArr[i] = 0;
-		pxPrev = pxGridS[pos];
-		pos++;
-		for (j = 1; j < widthS; j++){
-			changeArr[i] += (pxPrev != pxGridS[pos]);
-			pxPrev = pxGridS[pos];
-			pos++;
-		}
-		posS += widthS;
-	}
-	//after all the color changes have been counted, try to find the starting area (defined as one quarter of the height of the small image) with the greates amount of change
-	lenC = (heightS / 4) + 1;
-	lenT = heightS - lenC + 1;
-	changeCount = 0;
-	for (i = 0; i < lenT; i++){
-		//start to count changes on each line
-		changeCountBuf = 0;
-		for (j = 0; j < lenC; j++){
-			changeCountBuf += changeArr[i + j];
-		}
-		if (changeCountBuf > changeCount){
-			changeCount = changeCountBuf;
-			posS = i;
-		}
-	}
-	changeCountH = changeCount;
-	posB = posS;
-	free((void *) changeArr);
-	//now do the same with vertical scanning
-	posS = 0;
-	changeArr = (int *) malloc(sizeof(int) * widthS);
-	for (i = 0; i < widthS; i++){
-		//for each column of the small image, count up how often the color changes
-		pos = posS;
-		changeArr[i] = 0;
-		pxPrev = pxGridS[pos];
-		pos += widthS;
-		for (j = 1; j < heightS; j++){
-			changeArr[i] += (pxPrev != pxGridS[pos]);
-			pxPrev = pxGridS[pos];
-			pos += widthS;
-		}
-		posS++;
-	}
-	//after all the color changes have been counted, try to find the starting area (defined as one quarter of the width of the small image) with the greates amount of change
-	lenC = (widthS / 4) + 1;
-	lenT = widthS - lenC + 1;
-	changeCount = 0;
-	for (i = 0; i < lenT; i++){
-		//start to count changes on each column
-		changeCountBuf = 0;
-		for (j = 0; j < lenC; j++){
-			changeCountBuf += changeArr[i + j];
-		}
-		if (changeCountBuf > changeCount){
-			changeCount = changeCountBuf;
-			posS = i;
-		}
-	}
-	free((void *) changeArr);
-	//finally check whether the area with the greatest change is in the horizontal or vertical direction
-	if (((changeCount * 10000) / heightS) > ((changeCountH * 10000) / widthS)){ //we must compare the change density instead of the change volume to ensure a faster search
-		//if the adjusted change count is greater for the vertical scan
-		jumpPS = posS;
-		jumpPB = posS;
-		movPS = widthS;
-		movPB = widthB;
-		lenP = heightS;
-		movOS = 1;
-		movOB = 1;
-		lenO = widthS - posS;
-		lenR = posS;
 	}
 	else {
-		//otherwise we use the horizontal scan
-		jumpPS = posB * widthS;
-		jumpPB = posB * widthB;
-		movPS = 1;
-		movPB = 1;
-		lenP = widthS;
-		movOS = widthS;
-		movOB = widthB;
-		lenO = heightS - posB;
-		lenR = posB;
-	}
-	//adjust the color pixel counts to match the required precision minus 10 (to try and compensate for the random distribution of errors)
-	adjPrec = precision - 0.1;
-	for (i = 0; i < colorCount; i++){
-		colorPixelCountC[i] = colorPixelCount[i] = (int)(((float) colorPixelCount[i]) * adjPrec);
-	}
-	//determine the size of the color check grid by seeing how many color check tiles can fit in the big image
-	//get the size of the tile grid in the horizontal direction
-	lenT = 2 * widthS; //the standard grid tile's width is twice the width of the small image
-	widthLenT = widthB / lenT;
-	widthLenT += ((widthB % lenT) / widthS); //the tile grid has a final horizontal tile if the remaining space after all the normal tiles are subtracted is bigger than the width of the small image
-	widthT = (int *) malloc(sizeof(int) * widthLenT);
-	widthTC  = (int *) malloc(sizeof(int) * widthLenT);
-	//fill the width array with the calculated tile width up to the last tile
-	widthLenT--;
-	lenC = (3 * widthS) - 1; //the area we need to check for the color is bigger than the tile, since it encompasses the area of the small image when starting from the last pixel of the tile
-	for (i = 0; i < widthLenT; i++){
-		widthT[i] = lenT;
-		widthTC[i] = lenC;
-	}
-	//the last tile's width is dependent on the remaining space
-	widthTC[widthLenT] = widthB - (2 * widthS * widthLenT);
-	widthT[widthLenT] = widthTC[widthLenT] - widthS + 1;
-	widthLenT++;
-	//get the size of the tile grid in the vertical direction
-	lenT = 2 * heightS; //the standard grid tile's height is twice the height of the small image
-	heightLenT = heightB / lenT;
-	heightLenT += ((heightB % lenT) / heightS); //the tile grid has a final vertical tile if the remaining space after all the normal tiles are subtracted is bigger than the height of the small image
-	heightT = (int *) malloc(sizeof(int) * heightLenT);
-	heightTC = (int *) malloc(sizeof(int) * heightLenT);
-	//fill the height array with the calculated tile height up to the last tile
-	heightLenT--;
-	lenC = (3 * heightS) - 1; //the area we need to check for the color is bigger than the tile, since it encompasses the area of the small image when starting from the last pixel of the tile
-	for (i = 0; i < heightLenT; i++){
-		heightT[i] = lenT;
-		heightTC[i] = lenC;
-	}
-	//the last tile's height is dependent on the remaining space
-	heightTC[heightLenT] = heightB - (2 * heightS * heightLenT);
-	heightT[heightLenT] = heightTC[heightLenT] - heightS + 1;
-	heightLenT++;
-	//check each tile in the grid to see if the colors match those of the small image, and check to see if the small image is found if that is the case
-	posT = posTL = 0;
-	lenT = 2 * widthS;
-	movTC = (lenT < widthB)? lenT : widthB;
-	lenT = 2 * heightS;
-	movTL = ((lenT < heightB)? lenT : heightB) * widthB;
-	colorPixelCountC[20] = 0;
-	posM = 0;
-	matchPxAll = 0;
-	matchPxMin = (int) ((float) pxCountS * precision);
-	matchCount = 0;
-	for (i = 0; i < heightLenT; i++){
-		for (j = 0; j < widthLenT; j++){
-			//go through all pixels of the tile and count up the colors
-			pos = posS = posT;
-			for (k = 0; k < heightTC[i]; k++){
-				for (l = 0; l < widthTC[j]; l++){
-					colorPixelCountC[pxGridB[pos++]]--; //we already converted all colors of the big pixel grid into indexes of the colors present in the small image, which we are tracking with the color pixel count array
-				}
-				posS += widthB;
-				pos = posS;
-			}
-			//check if all the required colors are present in the tile and reset the color pixel count array
-			colorFound = 1;
-			for (k = 0; k < colorCount; k++){
-				if (colorPixelCountC[k] > 0) colorFound = 0;
-				colorPixelCountC[k] = colorPixelCount[k];
-			}
-			colorPixelCountC[20] = 0;
-			//if all the color pixels were found, try to find the small image in the current tile
-			if (colorFound){
-				//go through every pixel in the tile and try to match the small image starting from that tile
-				posCount = widthT[j] * heightT[i];
-				posS = posB = posT;
-				colB = lenT = j * 2 * widthS;
-				maxPosH = lenT + widthT[j];
-				lineB = i * 2 * heightS;
-				for (k = 0; k < posCount; k++){
-					//set the starting position to the predetermined area of greatest change
-					posAB = posS + jumpPB;
-					posAS = jumpPS;
-					//scan both images to macth each pixel
-					matchPx = pxCountS;
-					isMatch = 1;
-					for (l = 0; l < lenO; l++){
-						posCS = posAS;
-						posCB = posAB;
-						for (m = 0; m < lenP; m++){
-							matchPx -= (pxGridB[posCB] != pxGridS[posCS]);
-							if (matchPx < matchPxMin){
-								isMatch = 0;
-								goto matchCheck; //if this is not a match stop checking right away
-							}
-							posCS += movPS;
-							posCB += movPB;
-						}
-						posAS += movOS;
-						posAB += movOB;
-					}
-					//check the rest of the image
-					posAB = posS;
-					posAS = 0;
-					//scan both images to macth each pixel
-					for (l = 0; l < lenR; l++){
-						posCS = posAS;
-						posCB = posAB;
-						for (m = 0; m < lenP; m++){
-							matchPx -= (pxGridB[posCB] != pxGridS[posCS]);
-							if (matchPx < matchPxMin){
-								isMatch = 0;
-								goto matchCheck; //if this is not a match stop checking right away
-							}
-							posCS += movPS;
-							posCB += movPB;
-						}
-						posAS += movOS;
-						posAB += movOB;
-					}
-					//check whether it's a match
-					matchCheck: if (isMatch) {
-						//if it is the action taken is dependent on whether we are looking for the best match
-						if (bestMatch){
-							//if we are looking for the best match compare it to the previous one and replace it if it is better
-							if (matchPx > matchPxAll){
-								matchCount = 1;
-								matchPxAll = matchPx;
-								matchData[0] = lineB;
-								matchData[1] = colB;
-								matchData[2] =  (matchPx * 1000) / pxCountS;
-							}
-						}
-						else {
-							//otherwise simply add it to the list of matches
-							matchCount++;
-							matchData[posM++] = lineB;
-							matchData[posM++] = colB;
-							matchData[posM++] = (matchPx * 1000) / pxCountS;
-							if (matchPx > matchPxAll) matchPxAll = matchPx;
-						}
-					}
-					//change the match position
-					colB++;
-					if (colB >= maxPosH){
-						//reset the column and change the position if the small image position column is beyond the current tile
-						colB = lenT;
-						lineB++;
-						posB += widthB;
-						posS = posB;
-					}
-					else {
-						posS++;
-					}
-				}
-			}
-			posT += movTC;
+		//if this is a search for all matches above the threshold
+		threshold = (int) ((float) pxCount * precision);
+		widthAdj = imgSml->width - 1;
+		heightAdj = imgSml->height - 1;
+		//the search goes faster if we start from the maximum match and remove the misses
+		for (i = 0; i < posCount; i++){
+			matchScore = CheckMatch(pxArrBig, pxArrSml, pxCount, posB + colB, imgSml->height, imgSml->width, threshold, lineJump);
+			//check if it's above the threshold, and, if it is, record it and the position and match percentage
+			if (matchScore > threshold) matchData[matchCount++] = (MatchData){.a.top = lineB, .a.bottom = lineB + heightAdj, .a.left = colB, .a.right = colB + widthAdj, .matchP = (float) matchScore / pxCountF};
+			//change the search position
+			MoveSearchColumn(&colB, &lineB, &posB, maxPosH, imgBig->width);
 		}
-		posTL += movTL;
-		posT = posTL;
-	}
-	//merge the matches if we must
-	if (!bestMatch && matchCount && merge){
-		mergeMatchData = (int *) malloc(sizeof(int) * (matchCount * 5));
-		mergeMatchCount = 0;
-		posT = matchCount * 3;
-		posTL = 0;
-		//for each match check whether it occupies the same space an existing merged match
-		for (i = 0; i < posT; i += 3){
-			isMatch = 0;
-			lineB = matchData[i] + heightS - 1;
-			colB = matchData[i + 1] + widthS - 1;
-			for (j = 0; j < posTL; j += 5){
-				//check whether the match occupies the same space as the current merged match
-				if ((((matchData[i] >= mergeMatchData[j]) && (matchData[i] <= mergeMatchData[j + 1])) || ((lineB >= mergeMatchData[j]) && (lineB <= mergeMatchData[j + 1]))) && (((matchData[i + 1] >= mergeMatchData[j + 2]) && (matchData[i + 1] <= mergeMatchData[j + 3])) || ((colB >= mergeMatchData[j + 2]) && (colB <= mergeMatchData[j + 3])))){
-					//if it does, compare their match percentages
-					if (matchData[i + 2] > mergeMatchData[j + 4]){
-						//if the match percentage for the current match is greater than the merged match, replace the merged match
-						mergeMatchData[j] = matchData[i];
-						mergeMatchData[j + 1] = lineB;
-						mergeMatchData[j + 2] = matchData[i + 1];
-						mergeMatchData[j + 3] = colB;
-						mergeMatchData[j + 4] = matchData[i + 2];
-					}
-					else if (matchData[i + 2] == mergeMatchData[j + 4]){
-						//if the match percentage is equal, check whether the current match is closer to the top left of the screen
-						if ((matchData[i] <= mergeMatchData[j]) && (matchData[i + 1] <= mergeMatchData[j + 2])){
+		//if the merge signal is on and there is at least two matches, merge all matches that overlap
+		if ((matchCount > 1) && merge){
+			mergeMatchData = (MatchData *) malloc(sizeof(MatchData) * matchCount);
+			mergeMatchCount = 0;
+			//for each match check whether it occupies the same space an existing merged match
+			for (i = 0; i < matchCount; i++){
+				isMatch = 0;
+				for (j = 0; j < mergeMatchCount; j++){
+					//check whether the match occupies the same space as the current merged match
+					if ((((matchData[i].a.left >= mergeMatchData[j].a.left) && (matchData[i].a.left <= mergeMatchData[j].a.right)) || ((matchData[i].a.right >= mergeMatchData[j].a.left) && (matchData[i].a.right <= mergeMatchData[j].a.right))) && (((matchData[i].a.top >= mergeMatchData[j].a.top) && (matchData[i].a.top <= mergeMatchData[j].a.bottom)) || ((matchData[i].a.bottom >= mergeMatchData[j].a.top) && (matchData[i].a.bottom <= mergeMatchData[j].a.bottom)))){
+						//if it does, compare their match percentages
+						if (matchData[i].matchP > mergeMatchData[j].matchP){
+							//if the match percentage for the current match is greater than the merged match, replace the merged match
 							mergeMatchData[j] = matchData[i];
-							mergeMatchData[j + 1] = lineB;
-							mergeMatchData[j + 2] = matchData[i + 1];
-							mergeMatchData[j + 3] = colB;
-							mergeMatchData[j + 4] = matchData[i + 2];
 						}
+						else if (matchData[i].matchP == mergeMatchData[j].matchP){
+							//if the match percentage is equal, check whether the current match is closer to the top left of the screen
+							if ((matchData[i].a.left <= mergeMatchData[j].a.left) && (matchData[i].a.top <= mergeMatchData[j].a.top)) mergeMatchData[j] = matchData[i];
+						}
+						//move on to the next match
+						isMatch = 1;
+						break;
 					}
-					//move on to the next match
-					isMatch = 1;
-					break;
 				}
+				//add it to the merged match data if it did not shared space with an existing merged match
+				if (!isMatch) mergeMatchData[mergeMatchCount++] = matchData[i];
 			}
-			//add it to the merged match data if it did not shared space with an existing merged match
-			if (!isMatch){
-				mergeMatchData[posTL] = matchData[i];
-				mergeMatchData[posTL + 1] = lineB;
-				mergeMatchData[posTL + 2] = matchData[i + 1];
-				mergeMatchData[posTL + 3] = colB;
-				mergeMatchData[posTL + 4] = matchData[i + 2];
-				mergeMatchCount++;
-				posTL += 5;
-			}
+			//copy the merge match data into the match data array
+			matchCount = mergeMatchCount;
+			memcpy((char *) matchData, (char *) mergeMatchData, sizeof(MatchData) * mergeMatchCount);
+			//clean up
+			free((void *) mergeMatchData);
 		}
-		//copy the merge match data into the match data array
-		matchCount = mergeMatchCount;
-		pos = 0;
-		for (i = 0; i < posTL; i += 5){
-			matchData[pos++] = mergeMatchData[i];
-			matchData[pos++] = mergeMatchData[i + 2];
-			matchData[pos++] = mergeMatchData[i + 4];
-		}
-		//clean up
-		free((void *) mergeMatchData);
 	}
-	//cleanup and return the match value
-	free((void *) pxGridS);
-	free((void *) pxGridB);
-	free((void *) widthT);
-	free((void *) widthTC);
-	free((void *) heightT);
-	free((void *) heightTC);
+	//clean up and return the match count
+	free((void *) pxArrSml);
+	free((void *) pxArrBig);
 	return matchCount;
+}
+
+static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, int posChange){
+	//this function moves the search column and checks whether it is beyond the maximum horizontal position
+	(*col)++;
+	if (*col >= maxPosH){
+		//reset the column and change the position if the column is above the maximum possible horizontal positions
+		*col = 0;
+		(*line)++;
+		*pos += posChange;
+	}
 }
 
 void GetRelevantRectangle(uint8_t *imgPx, uint32_t *rectDim, int width, int height, int hasAlpha, uint8_t *backgroundColor){

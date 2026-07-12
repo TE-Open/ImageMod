@@ -11,6 +11,10 @@ class Area(Structure):
 	#this class represents an Area structure in the shared library
 	_fields_ = [("top", c_int), ("bottom", c_int), ("left", c_int), ("right", c_int)]
 
+class MatchData(Structure):
+	#this class represents an MatchData structure in the shared library
+	_fields_ = [("a", Area), ("matchP", c_float)]
+
 class ImageModSL:
 	#this class is used to access the functions in the shared library
 	def __init__(self, path = None):
@@ -77,7 +81,7 @@ class ImageModSL:
 			self.pixelMatch.restype = c_float
 			#load the get image position function
 			self.getImagePosition = self.SL.GetImagePosition
-			self.getImagePosition.argtypes = [POINTER(c_ubyte), POINTER(c_ubyte), POINTER(c_int), c_int, c_int, c_int, c_int, c_int, c_int, c_int, c_float, c_int, c_int]
+			self.getImagePosition.argtypes = [POINTER(ImageData), POINTER(ImageData), POINTER(MatchData), c_int, c_float, c_int, c_int]
 			self.getImagePosition.restype = c_int
 			#load the relevant rectangle function
 			self.getRelevantRectangle = self.SL.GetRelevantRectangle
