@@ -557,42 +557,26 @@ static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, 
 	}
 }
 
-void GetRelevantRectangle(uint8_t *imgPx, uint32_t *rectDim, int width, int height, int hasAlpha, uint8_t *backgroundColor){
-	//this function is used to get the dimensions of the rectangle containing relevant pixels (different from the background color)
-	int top = height, bottom = 0, left = width, right = 0;
+void GetRelevantArea(ImageData* img, Area* area, UBYTE* backgroundColor){
+	//this function is used to get the dimensions of the area containing relevant pixels (different from the background color)
 	//go through every pixel and try to find the top bottom left and right pixels that differ from the background color
-	int pxLen = (hasAlpha)? 4 : 3;
-	int i, j, k, pos = 0;
-	int isRelevant;
-	for (i = 0; i < height; i++){
-		for (j = 0; j < width; j++){
+	int i, j, pos, pxLen;
+	*area = (Area){.top = img->height, .bottom = -1, .left = img->width, .right = -1};
+	pxLen = 3 + img->hasAlpha;
+	pos = 0;
+	for (i = 0; i < img->height; i++){
+		for (j = 0; j < img->width; j++){
 			//check if the pixel is different from the background color (the alpha channelis not checked)
-			isRelevant = 0;
-			for (k = 0; k < 3; k++){
-				if (imgPx[pos + k] != backgroundColor[k]){
-					isRelevant = 1;
-					break;
-				}
+			if ((img->bA[pos] != backgroundColor[0]) || (img->bA[pos + 1] != backgroundColor[1]) || (img->bA[pos + 2] != backgroundColor[2])){
+				//if the pixel is relevant, we see if it lies beyond the borders of the curent relevant area, and expand it if it does
+				if (i < area->top) area->top = i;
+				if (i > area->bottom) area->bottom = i;
+				if (j < area->left) area->left = j;
+				if (j > area->right) area->right = j;
 			}
 			pos += pxLen;
-			//if the pixel is relevant, we see if it lies beyond the borders of the curent relevant rectanlge
-			if (isRelevant){
-				if (i < top)
-					top = i;
-				if (i > bottom)
-					bottom = i;
-				if (j < left)
-					left = j;
-				if (j > right)
-					right = j;
-			}
 		}
 	}
-	//assign the values to the relevant rectangle
-	rectDim[0] = (uint32_t) top;
-	rectDim[1] = (uint32_t) bottom;
-	rectDim[2] = (uint32_t) left;
-	rectDim[3] = (uint32_t) right;
 }
 
 int GetElementList(uint8_t *imgPx, int *elDim, int width, int height, int hasAlpha, uint8_t *backgroundColor, int dimH, int dimV){

@@ -35,5 +35,5 @@ void EraseSegments(ImageData* img, int maxWidth, int maxHeight, UBYTE* backgroun
 void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* backgroundColor);
 float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha);
 int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData, int ignoreAlpha, float precision, int bestMatch, int merge);
-void GetRelevantRectangle(uint8_t *imgPx, uint32_t *rectDim, int width, int height, int hasAlpha, uint8_t *backgroundColor);
+void GetRelevantArea(ImageData* img, Area* area, UBYTE* backgroundColor);
 int GetElementList(uint8_t *imgPx, int *elDim, int width, int height, int hasAlpha, uint8_t *backgroundColor, int dimH, int dimV);

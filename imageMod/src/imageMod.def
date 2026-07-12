@@ -9,5 +9,5 @@ EXPORTS
 	RemoveEmptyLines
 	PixelMatch
 	GetImagePosition
-	GetRelevantRectangle
+	GetRelevantArea
 	GetElementList

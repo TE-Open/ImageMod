@@ -83,9 +83,10 @@ class ImageModSL:
 			self.getImagePosition = self.SL.GetImagePosition
 			self.getImagePosition.argtypes = [POINTER(ImageData), POINTER(ImageData), POINTER(MatchData), c_int, c_float, c_int, c_int]
 			self.getImagePosition.restype = c_int
-			#load the relevant rectangle function
-			self.getRelevantRectangle = self.SL.GetRelevantRectangle
-			self.getRelevantRectangle.argtypes = [POINTER(c_ubyte), POINTER(c_uint32), c_int, c_int, c_int, POINTER(c_ubyte)]
+			#load the relevant area function
+			self.getRelevantArea = self.SL.GetRelevantArea
+			self.getRelevantArea.argtypes = [POINTER(ImageData), POINTER(Area), POINTER(c_ubyte)]
+			self.getRelevantArea.restype = None
 			#load the get element list function
 			self.getElementList = self.SL.GetElementList
 			self.getElementList.argtypes = [POINTER(c_ubyte), POINTER(c_int), c_int, c_int, c_int, POINTER(c_ubyte), c_int, c_int]
