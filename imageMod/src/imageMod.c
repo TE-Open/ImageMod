@@ -6,6 +6,14 @@ typedef struct sSegment{
 	int start;
 	int length;
 } Segment;
+
+typedef struct sSplitArea{
+	Area area[3];
+	int currentPos;
+} SplitArea;
+
+enum AREATYPE {ART_BORDER, ART_FIRST, ART_LAST};
+enum SPLITTYPE {SPT_NONE, SPT_HORIZONTAL, SPT_VERTICAL};
 //constant declarations
 static UBYTE trueColor[8][3] = {{0, 0, 0}, {255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 0}, {255, 0, 255}, {0, 255, 255}, {255, 255, 255}};
 static UBYTE blackWhiteColor[2][3] = {{0, 0, 0}, {255, 255, 255}};
@@ -18,6 +26,12 @@ static inline int FindSegments(char* relArr, Segment* segArr, int dimP, int dimS
 static inline void ClearSegments(ImageData* img, Segment* segArr, int segCount, int pxLen, int move, UBYTE* backgroundColor);
 static inline void BuildPixelArray(ImageData* img, uint32_t *pxArr, int ignoreAlpha);
 static inline int CheckMatch(uint32_t *pxArrA, uint32_t *pxArrB, int matchScore, int posStart, int height, int width, int threshold, int lineJump);
+static inline void BuildColorMinima(int* colorPxArr, int* colorMinArr, int pxCount, int colorCountCheck, float precision);
+static inline int CheckAreaSplit(Area* area, int minSizeV, int minSizeH);
+static inline void BuildSplitArea(Area* area, SplitArea *splitArea, int splitType, int borderOffsetH, int borderOffsetV);
+static inline int CheckColor(uint32_t* pxArr, uint32_t* colorArr, int* colorMaxArr, int* colorMinArr, int colorCount, int posStart, int height, int width, int lineJump);
+static inline int FindBestMatch(Area* area, ImageData* img, uint32_t* pxArrSml, uint32_t* pxArrBig, MatchData* matchData, int* matchCount, int threshold, int pxCount, int lineJump);
+static inline void FindAllMatches(Area* area, ImageData* img, uint32_t* pxArrSml, uint32_t* pxArrBig, MatchData* matchData, int* matchCount, int threshold, int pxCount, int lineJump);
 static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, int posChange);
 
 void ColorReduce(ImageData* img, int blackWhite){
@@ -386,7 +400,7 @@ void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* bac
 
 float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha){
 	//this function checks the small and big images and returns the percentage of pixels that match for the best match
-	int i, pos, posB, colB, pxCount, lineJump, maxPosH, posCount, matchScore, matchScoreBest;
+	int i, pos, posB, colB, pxCount, maxPosH, posCount, matchScore, matchScoreBest;
 	uint32_t *pxArrSml, *pxArrBig;
 	//check that the small image is smaller in width and height than the big image
 	if ((imgSml->width > imgBig->width) || (imgSml->height > imgBig->height)) return 0;
@@ -397,12 +411,11 @@ float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha){
 	pxArrBig = (uint32_t *) malloc(sizeof(uint32_t) * (imgBig->width * imgBig->height));
 	BuildPixelArray(imgBig, pxArrBig, ignoreAlpha);
 	//get the number of possible positions that the small image can fit into the large one
-	lineJump = imgBig->width - imgSml->width;
-	maxPosH = lineJump + 1;
+	maxPosH = imgBig->width - imgSml->width + 1;
 	posCount = maxPosH * (imgBig->height - imgSml->height + 1);
 	posB = colB = matchScoreBest = 0;
 	for (i = 0; i < posCount; i++){
-		matchScore = CheckMatch(pxArrBig, pxArrSml, pxCount, posB + colB, imgSml->height, imgSml->width, matchScoreBest, lineJump);
+		matchScore = CheckMatch(pxArrBig, pxArrSml, pxCount, posB + colB, imgSml->height, imgSml->width, matchScoreBest, imgBig->width);
 		//check if it's a better match and assign it if it is
 		if (matchScore > matchScoreBest) matchScoreBest = matchScore;
 		//change the match position
@@ -430,7 +443,7 @@ static inline void BuildPixelArray(ImageData* img, uint32_t *pxArr, int ignoreAl
 		//if the image does not have an alpha channel, or it is ignored in the comparison, copy the red, green, and blue channels to the pixel array and set the transparency channel to zero
 		pxLen = 3 + img->hasAlpha;
 		pxCount = img->width * img->height;
-		memset((char *) pxArr, 0, (pxCount * pxLen)); //set all bytes to zero
+		memset((char *) pxArr, 0, (pxCount * 4)); //set all bytes to zero
 		pos = 0;
 		for (i = 0; i < pxCount; i++){
 			//copy the red, green, and blue channels
@@ -444,25 +457,29 @@ static inline void BuildPixelArray(ImageData* img, uint32_t *pxArr, int ignoreAl
 static inline int CheckMatch(uint32_t *pxArrA, uint32_t *pxArrB, int matchScore, int posStart, int height, int width, int threshold, int lineJump){
 	//this function checks how often two pixel arrays match and returns if it goes below a threshold
 	int i, j, posA, posB;
-	posA = posStart;
 	posB = 0;
 	for (i = 0; i < height; i++){
+		posA = posStart;
 		for (j = 0; j < width; j++){
 			//remove one from the match score for each pixel that doesn't match
 			matchScore -= (pxArrA[posA++] != pxArrB[posB++]);
 		}
 		if (matchScore < threshold) break; //if the match score is below the threshold, exit
-		posA += lineJump; //move to the next line in the big image
+		posStart += lineJump; //move to the next line in the big image
 	}
 	return matchScore;
 }
 
-int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData, int ignoreAlpha, float precision, int bestMatch, int merge){
+int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData, int ignoreAlpha, float precision, int bestMatch, int merge, int colorCheckCount){
 	//this function tries to find the small image in the big image with the given precision (percentage of matching pixels)
-	int i, j, posB, colB, lineB, pxCount, lineJump, maxPosH, posCount, matchScore, threshold, matchCount, mergeMatchCount, widthAdj, heightAdj, isMatch;
+	int i, j, pos, pxCount, threshold, matchCount, mergeMatchCount, isMatch, colorCount, colorCountC, val;
+	int minSizeH, minSizeV, borderOffsetH, borderOffsetV, splitIndex;
+	int colorPxArr[8], colorMinArr[8];
+	Area area, *areaP;
+	SplitArea *splitArea;
 	MatchData *mergeMatchData;
 	float pxCountF;
-	uint32_t *pxArrSml, *pxArrBig;
+	uint32_t *pxArrSml, *pxArrBig, colorArr[8], val32;
 	//check that the small image is smaller in width and height than the big image
 	if ((imgSml->width > imgBig->width) || (imgSml->height > imgBig->height)) return 0;
 	//to speed up the search, build an array of 32 bit inetegers representing the pixels for both images
@@ -472,78 +489,284 @@ int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData,
 	BuildPixelArray(imgSml, pxArrSml, ignoreAlpha);
 	pxArrBig = (uint32_t *) malloc(sizeof(uint32_t) * (imgBig->width * imgBig->height));
 	BuildPixelArray(imgBig, pxArrBig, ignoreAlpha);
-	//whether we add the matches up or remove the misses from the maximum is dependent on the required precision and whether this is a best only match
-	lineJump = imgBig->width - imgSml->width;
-	maxPosH = lineJump + 1;
-	posCount = maxPosH * (imgBig->height - imgSml->height + 1);
-	matchCount = posB = colB = lineB = 0;
-	if (bestMatch){
-		//if this is a best match search, the threshold is the currenct best match score
-		threshold = 0;
-		for (i = 0; i < posCount; i++){
-			matchScore = CheckMatch(pxArrBig, pxArrSml, pxCount, posB + colB, imgSml->height, imgSml->width, threshold, lineJump);
-			//check if it's a better match
-			if (matchScore > threshold){
-				//if it is record it, and record the position and match percentage
-				threshold = matchScore;
-				matchCount = 1;
-				matchData[0] = (MatchData){.a.top = lineB, .a.bottom = 0, .a.left = colB, .a.right = 0, .matchP = (float) matchScore / pxCountF};
+	//get the colors from the small image
+	colorCount = 0;
+	for (i = 0; i < pxCount; i++){
+		val = 0;
+		//look for the current pixel color in all the recorded colors
+		for (j = 0; j < colorCount; j++){
+			if (pxArrSml[i] == colorArr[j]){
+				//if it is found, increment the color pixel counter
+				val = 1;
+				colorPxArr[j]++;
+				break;
 			}
-			//change the search position
-			MoveSearchColumn(&colB, &lineB, &posB, maxPosH, imgBig->width);
+		}
+		if (!val){
+			//if the pixel color was not found, add it to the recorded colors
+			colorArr[colorCount] = pxArrSml[i];
+			colorPxArr[colorCount++] = 1;
+		}
+	}
+	//reorganise the colors from most to least common
+	for(i = 1; i < colorCount; i++){
+		for (j = i - 1; j >= 0; j--){
+			//for each color, check that its pixel count is greater than the previous color
+			pos = j + 1;
+			if (colorPxArr[j] < colorPxArr[pos]){
+				//if it is, swap the color and color pixel counts
+				val = colorPxArr[j];
+				val32 = colorArr[j];
+				colorPxArr[j] = colorPxArr[pos];
+				colorArr[j] = colorArr[pos];
+				colorPxArr[pos] = val;
+				colorArr[pos] = val32;
+			}
+			else {
+				//if not, the colors are in order, move on to the next color
+				break;
+			}
+		}
+	}
+	colorCountC = (colorCheckCount && (colorCount > colorCheckCount))? colorCheckCount : colorCount;
+	//get the minimum horizontal and vertical sizes for splitting based on the size of the small image
+	minSizeH = (int) (((float) imgSml->width) * 2.5);
+	minSizeV = (int) (((float) imgSml->height) * 2.5);
+	//get the offset for the start and end of the horizontal and vertical border areas based on the size of the small image
+	borderOffsetH = (imgSml->width > 2)? (imgSml->width - 2) : 0;
+	borderOffsetV = (imgSml->height > 2)? (imgSml->height - 2) : 0;
+	//calculate the threshold and minimum colors
+	threshold = (int) pxCountF * precision;
+	BuildColorMinima(colorPxArr, colorMinArr, pxCount, colorCountC, precision * 0.8);
+	//whether we add the matches up or remove the misses from the maximum is dependent on the required precision and whether this is a best only match
+	matchCount = splitIndex = 0;
+	area = (Area){.top = 0, .bottom = imgBig->height - 1, .left = 0, .right = imgBig->width - 1};
+	areaP = &area;
+	//check if the initial area must be split
+	val = CheckAreaSplit(areaP, minSizeV, minSizeH);
+	if (!val){
+		//if there was no need to split the initial area, check whether theere are enough color pixels to justify looking for the image
+		val = CheckColor(pxArrBig, colorArr, colorPxArr, colorMinArr, colorCountC, 0, imgBig->height, imgBig->width, imgBig->width);
+		if (val){
+			//if the color check is positive, check if the image is there
+			if (bestMatch){
+				FindBestMatch(areaP, imgSml, pxArrSml, pxArrBig, matchData, &matchCount, threshold, pxCount, imgBig->width);
+			}
+			else {
+				FindAllMatches(areaP, imgSml, pxArrSml, pxArrBig, matchData, &matchCount, threshold, pxCount, imgBig->width);
+			}
 		}
 	}
 	else {
-		//if this is a search for all matches above the threshold
-		threshold = (int) ((float) pxCount * precision);
-		widthAdj = imgSml->width - 1;
-		heightAdj = imgSml->height - 1;
-		//the search goes faster if we start from the maximum match and remove the misses
-		for (i = 0; i < posCount; i++){
-			matchScore = CheckMatch(pxArrBig, pxArrSml, pxCount, posB + colB, imgSml->height, imgSml->width, threshold, lineJump);
-			//check if it's above the threshold, and, if it is, record it and the position and match percentage
-			if (matchScore > threshold) matchData[matchCount++] = (MatchData){.a.top = lineB, .a.bottom = lineB + heightAdj, .a.left = colB, .a.right = colB + widthAdj, .matchP = (float) matchScore / pxCountF};
-			//change the search position
-			MoveSearchColumn(&colB, &lineB, &posB, maxPosH, imgBig->width);
-		}
-		//if the merge signal is on and there is at least two matches, merge all matches that overlap
-		if ((matchCount > 1) && merge){
-			mergeMatchData = (MatchData *) malloc(sizeof(MatchData) * matchCount);
-			mergeMatchCount = 0;
-			//for each match check whether it occupies the same space an existing merged match
-			for (i = 0; i < matchCount; i++){
-				isMatch = 0;
-				for (j = 0; j < mergeMatchCount; j++){
-					//check whether the match occupies the same space as the current merged match
-					if ((((matchData[i].a.left >= mergeMatchData[j].a.left) && (matchData[i].a.left <= mergeMatchData[j].a.right)) || ((matchData[i].a.right >= mergeMatchData[j].a.left) && (matchData[i].a.right <= mergeMatchData[j].a.right))) && (((matchData[i].a.top >= mergeMatchData[j].a.top) && (matchData[i].a.top <= mergeMatchData[j].a.bottom)) || ((matchData[i].a.bottom >= mergeMatchData[j].a.top) && (matchData[i].a.bottom <= mergeMatchData[j].a.bottom)))){
-						//if it does, compare their match percentages
-						if (matchData[i].matchP > mergeMatchData[j].matchP){
-							//if the match percentage for the current match is greater than the merged match, replace the merged match
-							mergeMatchData[j] = matchData[i];
-						}
-						else if (matchData[i].matchP == mergeMatchData[j].matchP){
-							//if the match percentage is equal, check whether the current match is closer to the top left of the screen
-							if ((matchData[i].a.left <= mergeMatchData[j].a.left) && (matchData[i].a.top <= mergeMatchData[j].a.top)) mergeMatchData[j] = matchData[i];
-						}
-						//move on to the next match
-						isMatch = 1;
-						break;
-					}
+		//otherwise keep splitting the subareas unitl we find the image
+		splitArea = (SplitArea *) malloc(sizeof(SplitArea) * ((1 + (imgBig->width / minSizeH)) * (1 + (imgBig->height / minSizeV)))); //this is the maximum number of split areas that can fit in the big image
+		BuildSplitArea(areaP, splitArea, val, borderOffsetH, borderOffsetV);
+		while (1) {
+			//check current area to see if it can be split
+			areaP = &splitArea[splitIndex].area[splitArea[splitIndex].currentPos];
+			//check whether the current area has the correct colors for the image
+			val = CheckColor(pxArrBig, colorArr, colorPxArr, colorMinArr, colorCountC, areaP->left + (areaP->top * imgBig->width), (areaP->bottom - areaP->top + 1), (areaP->right - areaP->left + 1), imgBig->width);
+			if (val){
+				//if the color check was positive, check whether the area can be split
+				val = CheckAreaSplit(areaP, minSizeV, minSizeH);
+				if (val){
+					//if the area can be split, increase the split index and split the area into the new split area object
+					BuildSplitArea(areaP, &splitArea[++splitIndex], val, borderOffsetH, borderOffsetV);
 				}
-				//add it to the merged match data if it did not shared space with an existing merged match
-				if (!isMatch) mergeMatchData[mergeMatchCount++] = matchData[i];
+				else {
+					//if the area cannot be split, look for the image
+					if (bestMatch){
+						val = FindBestMatch(areaP, imgSml, pxArrSml, pxArrBig, matchData, &matchCount, threshold, pxCount, imgBig->width);
+						if (val > threshold){
+							//if the threshold has gone up (meaning the last image match had a higher pixel count than the threshold), recalculate the color minima
+							if (val == pxCount) break; //if the match value is equal to the number of pixels in the small image, it is the best possible match, and we can safely exit
+							threshold = val;
+							BuildColorMinima(colorPxArr, colorMinArr, pxCount, colorCountC, matchData[0].matchP * 0.8);
+						}
+					}
+					else {
+						FindAllMatches(areaP, imgSml, pxArrSml, pxArrBig, matchData, &matchCount, threshold, pxCount, imgBig->width);
+					}
+					//move on to the next area, or to the previous split area if this is the last area
+					while (++splitArea[splitIndex].currentPos == 3) if (--splitIndex < 0) goto IM_GIP_MatchEnd;
+				}
 			}
-			//copy the merge match data into the match data array
-			matchCount = mergeMatchCount;
-			memcpy((char *) matchData, (char *) mergeMatchData, sizeof(MatchData) * mergeMatchCount);
-			//clean up
-			free((void *) mergeMatchData);
+			else {
+				//if the current area did not contain enough colors to be a valid location for the image, move to the next area, or to the previous split area if this is the last area
+				while (++splitArea[splitIndex].currentPos == 3) if (--splitIndex < 0) goto IM_GIP_MatchEnd;
+			}
 		}
+		IM_GIP_MatchEnd:
+		free((void *) splitArea);
+	}
+	//if the merge signal is on and there is at least two matches, merge all matches that overlap
+	if ((matchCount > 1) && merge){
+		mergeMatchData = (MatchData *) malloc(sizeof(MatchData) * matchCount);
+		mergeMatchCount = 0;
+		//for each match check whether it occupies the same space an existing merged match
+		for (i = 0; i < matchCount; i++){
+			isMatch = 0;
+			for (j = 0; j < mergeMatchCount; j++){
+				//check whether the match occupies the same space as the current merged match
+				if ((((matchData[i].a.left >= mergeMatchData[j].a.left) && (matchData[i].a.left <= mergeMatchData[j].a.right)) || ((matchData[i].a.right >= mergeMatchData[j].a.left) && (matchData[i].a.right <= mergeMatchData[j].a.right))) && (((matchData[i].a.top >= mergeMatchData[j].a.top) && (matchData[i].a.top <= mergeMatchData[j].a.bottom)) || ((matchData[i].a.bottom >= mergeMatchData[j].a.top) && (matchData[i].a.bottom <= mergeMatchData[j].a.bottom)))){
+					//if it does, compare their match percentages
+					if (matchData[i].matchP > mergeMatchData[j].matchP){
+						//if the match percentage for the current match is greater than the merged match, replace the merged match
+						mergeMatchData[j] = matchData[i];
+					}
+					else if (matchData[i].matchP == mergeMatchData[j].matchP){
+						//if the match percentage is equal, check whether the current match is closer to the top left of the screen
+						if ((matchData[i].a.left <= mergeMatchData[j].a.left) && (matchData[i].a.top <= mergeMatchData[j].a.top)) mergeMatchData[j] = matchData[i];
+					}
+					//move on to the next match
+					isMatch = 1;
+					break;
+				}
+			}
+			//add it to the merged match data if it did not shared space with an existing merged match
+			if (!isMatch) mergeMatchData[mergeMatchCount++] = matchData[i];
+		}
+		//copy the merge match data into the match data array
+		matchCount = mergeMatchCount;
+		memcpy((char *) matchData, (char *) mergeMatchData, sizeof(MatchData) * mergeMatchCount);
+		//clean up
+		free((void *) mergeMatchData);
 	}
 	//clean up and return the match count
 	free((void *) pxArrSml);
 	free((void *) pxArrBig);
 	return matchCount;
+}
+
+static inline void BuildColorMinima(int* colorPxArr, int* colorMinArr, int pxCount, int colorCountCheck, float precision){
+	//this function calculates the color minima for all colors
+	int i, j, minBase;
+	for (i = 0; i < colorCountCheck; i++){
+		colorMinArr[i] = (int)(((float) colorPxArr[i]) * precision);
+	}
+}
+
+static inline int CheckAreaSplit(Area* area, int minSizeV, int minSizeH){
+	//this functions checks whether the supplied area can be split and returns the split type if it can
+	int height, width, splitType;
+	height = area->bottom - area->top + 1;
+	width = area->right - area->left + 1;
+	splitType = SPT_NONE;
+	if (height > width){
+		if (height > minSizeV){
+			splitType = SPT_VERTICAL;
+		}
+		else if (width > minSizeH){
+			splitType = SPT_HORIZONTAL;
+		}
+	}
+	else {
+		if (width > minSizeH){
+			splitType = SPT_HORIZONTAL;
+		}
+		else if (height > minSizeV){
+			splitType = SPT_VERTICAL;
+		}
+	}
+	return splitType;
+}
+
+static inline void BuildSplitArea(Area* area, SplitArea *splitArea, int splitType, int borderOffsetH, int borderOffsetV){
+	//this function attemtps to split the provided area into two, based on its size
+	int midPoint;
+	//a border zone is created between the two hlaves to deal with cases where the searched image is straddling the border
+	switch (splitType){
+		case SPT_HORIZONTAL:
+			midPoint = area->left + ((area->right - area->left + 1) / 2);
+			splitArea->area[ART_FIRST] = (Area){.top = area->top, .bottom = area->bottom, .left = area->left, .right = midPoint};
+			splitArea->area[ART_BORDER] = (Area){.top = area->top, .bottom = area->bottom, .left = midPoint - borderOffsetH, .right = midPoint + 1 + borderOffsetH};
+			splitArea->area[ART_LAST] = (Area){.top = area->top, .bottom = area->bottom, .left = midPoint + 1, .right = area->right};
+			splitArea->currentPos = 0;
+			break;
+		case SPT_VERTICAL:
+			midPoint = area->top + ((area->bottom - area->top + 1) / 2);
+			splitArea->area[ART_FIRST] = (Area){.top = area->top, .bottom = midPoint, .left = area->left, .right = area->right};
+			splitArea->area[ART_BORDER] = (Area){.top = midPoint - borderOffsetV, .bottom = midPoint + 1 + borderOffsetV, .left = area->left, .right = area->right};
+			splitArea->area[ART_LAST] = (Area){.top = midPoint + 1, .bottom = area->bottom, .left = area->left, .right = area->right};
+			splitArea->currentPos = 0;
+			break;
+	}
+}
+
+static inline int CheckColor(uint32_t* pxArr, uint32_t* colorArr, int* colorMaxArr, int* colorMinArr, int colorCount, int posStart, int height, int width, int lineJump){
+	//check the given area to see if there area enough color pixels to justify looking for the image
+	int i, j, k, pos, posS, pxCountC;
+	for (i = 0; i < colorCount; i++){
+		//go through each pixel in the area and check how many match the current color
+		pxCountC = 0;
+		posS = pos = posStart;
+		for (j = 0; j < height; j++){
+			for (k = 0; k < width; k++){
+				pxCountC += (pxArr[pos++] == colorArr[i]);
+			}
+			if (pxCountC > colorMaxArr[i]) break; //if the pixel count for this color is already above the maximum for the image, there is no need to check further
+			posS += lineJump;
+			pos = posS;
+		}
+		if (pxCountC < colorMinArr[i]) return 0; //if the color pixel count is below the minimum threshold for this color, the image cannot be in the area
+	}
+	//if all colors in the area are above their respective minimum, the image can be in the area
+	return 1;
+}
+
+static inline int FindBestMatch(Area* area, ImageData* img, uint32_t* pxArrSml, uint32_t* pxArrBig, MatchData* matchData, int* matchCount, int threshold, int pxCount, int lineJump){
+	//this function finds the location of the best match for the supplied image in the supplied area
+	int i, pos, col, line, matchScore, maxPosH, posCount;
+	float pxCountF;
+	maxPosH = (area->right - area->left + 1) - img->width + 1;
+	posCount = maxPosH * ((area->bottom - area->top + 1) - img->height + 1);
+	pxCountF = (float) pxCount;
+	pos = area->left + (area->top * lineJump);
+	col = line = 0;
+	for (i = 0; i < posCount; i++){
+		matchScore = CheckMatch(pxArrBig, pxArrSml, pxCount, pos + col, img->height, img->width, threshold, lineJump);
+		//check if it's a better match
+		if (matchScore >= threshold){
+			//if it is record it, and record the position and match percentage
+			threshold = matchScore;
+			*matchCount = 1;
+			matchData[0] = (MatchData){.a.top = area->top + line, .a.left = area->left + col, .matchP = (float) matchScore / pxCountF};
+			if (matchScore == pxCount) break; //if we matched all the small image pixels, this is the best match
+		}
+		//change the search position
+		MoveSearchColumn(&col, &line, &pos, maxPosH, lineJump);
+	}
+	if (*matchCount){
+		//if a match was found, update the bottom and right positions of the bast match
+		matchData[0].a.bottom = matchData[0].a.top + img->height - 1;
+		matchData[0].a.right = matchData[0].a.left + img->width - 1;
+	}
+	return threshold;
+}
+
+static inline void FindAllMatches(Area* area, ImageData* img, uint32_t* pxArrSml, uint32_t* pxArrBig, MatchData* matchData, int* matchCount, int threshold, int pxCount, int lineJump){
+	//this function finds the location of all matches for the supplied image in the supplied area
+	int i, pos, col, line, matchScore, top, left, widthAdj, heightAdj, maxPosH, posCount;
+	float pxCountF;
+	widthAdj = img->width - 1;
+	heightAdj = img->height - 1;
+	maxPosH = (area->right - area->left + 1) - img->width + 1;
+	posCount = maxPosH * ((area->bottom - area->top + 1) - img->height + 1);
+	pxCountF = (float) pxCount;
+	pos = area->left + (area->top * lineJump);
+	col = line = 0;
+	for (i = 0; i < posCount; i++){
+		matchScore = CheckMatch(pxArrBig, pxArrSml, pxCount, pos + col, img->height, img->width, threshold, lineJump);
+		//check if it's a better match
+		//check if it's above the threshold, and, if it is, record it and the position and match percentage
+		if (matchScore >= threshold){
+			top = area->top + line;
+			left = area->left + col;
+			matchData[(*matchCount)++] = (MatchData){.a.top = top, .a.bottom = top + heightAdj, .a.left = left, .a.right = left + widthAdj, .matchP = (float) matchScore / pxCountF};
+		}
+		//change the search position
+		MoveSearchColumn(&col, &line, &pos, maxPosH, lineJump);
+	}
 }
 
 static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, int posChange){

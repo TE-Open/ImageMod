@@ -82,7 +82,7 @@ class ImageModSL:
 			self.pixelMatch.restype = c_float
 			#load the get image position function
 			self.getImagePosition = self.SL.GetImagePosition
-			self.getImagePosition.argtypes = [POINTER(ImageData), POINTER(ImageData), POINTER(MatchData), c_int, c_float, c_int, c_int]
+			self.getImagePosition.argtypes = [POINTER(ImageData), POINTER(ImageData), POINTER(MatchData), c_int, c_float, c_int, c_int, c_int]
 			self.getImagePosition.restype = c_int
 			#load the relevant area function
 			self.getRelevantArea = self.SL.GetRelevantArea

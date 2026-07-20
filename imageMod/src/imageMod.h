@@ -34,6 +34,6 @@ void CopyArea(ImageData* imgCpy, ImageData* img, Area* area);
 void EraseSegments(ImageData* img, int maxWidth, int maxHeight, UBYTE* backgroundColor);
 void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* backgroundColor);
 float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha);
-int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData, int ignoreAlpha, float precision, int bestMatch, int merge);
+int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData, int ignoreAlpha, float precision, int bestMatch, int merge, int colorCheckCount);
 void GetRelevantArea(ImageData* img, Area* area, UBYTE* backgroundColor);
 int GetElementList(ImageData* img, Area* elList, UBYTE* backgroundColor, int dimH, int dimV);
