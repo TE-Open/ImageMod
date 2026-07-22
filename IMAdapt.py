@@ -8,6 +8,10 @@ class ImageData(Structure):
 	#this class represents an ImageData structure in the shared library
 	_fields_ = [("bA", POINTER(c_ubyte)), ("width", c_int), ("height", c_int), ("hasAlpha", c_int)]
 
+	def getByteCount(self):
+		#this function returns the total byte count for the current ImageData object
+		return (self.width * self.height * (3 + self.hasAlpha))
+
 class Area(Structure):
 	#this class represents an Area structure in the shared library
 	_fields_ = [("top", c_int), ("bottom", c_int), ("left", c_int), ("right", c_int)]
