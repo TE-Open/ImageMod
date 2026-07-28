@@ -8,6 +8,9 @@ class ImageData(Structure):
 	#this class represents an ImageData structure in the shared library
 	_fields_ = [("bA", POINTER(c_ubyte)), ("width", c_int), ("height", c_int), ("hasAlpha", c_int)]
 
+	def __repr__(self):
+		return f"{self.__class__.__name__}(width={self.width}, height={self.height}, hasAlpha={self.hasAlpha})"
+
 	def getByteCount(self):
 		#this function returns the total byte count for the current ImageData object
 		return (self.width * self.height * (3 + self.hasAlpha))
@@ -16,9 +19,15 @@ class Area(Structure):
 	#this class represents an Area structure in the shared library
 	_fields_ = [("top", c_int), ("bottom", c_int), ("left", c_int), ("right", c_int)]
 
+	def __repr__(self):
+		return f"{self.__class__.__name__}(top={self.top}, bottom={self.bottom}, left={self.left}, right={self.right})"
+
 class MatchData(Structure):
 	#this class represents an MatchData structure in the shared library
 	_fields_ = [("a", Area), ("matchP", c_float)]
+
+	def __repr__(self):
+		return f"{self.__class__.__name__}(top={self.a.top}, bottom={self.a.bottom}, left={self.a.left}, right={self.a.right}, matchP={self.matchP})"
 
 class ImageModSL:
 	#this class is used to access the functions in the shared library
