@@ -398,9 +398,9 @@ void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* bac
 	}
 }
 
-float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha){
+float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha, float minMatch){
 	//this function checks the small and big images and returns the percentage of pixels that match for the best match
-	int i, pos, posB, colB, pxCount, maxPosH, posCount, matchScore, matchScoreBest;
+	int i, pos, posB, colB, pxCount, maxPosH, posCount, matchScore, matchScoreBest, matchMin;
 	uint32_t *pxArrSml, *pxArrBig;
 	//check that the small image is smaller in width and height than the big image
 	if ((imgSml->width > imgBig->width) || (imgSml->height > imgBig->height)) return 0;
@@ -411,13 +411,17 @@ float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha){
 	pxArrBig = (uint32_t *) malloc(sizeof(uint32_t) * (imgBig->width * imgBig->height));
 	BuildPixelArray(imgBig, pxArrBig, ignoreAlpha);
 	//get the number of possible positions that the small image can fit into the large one
+	matchMin = (int) (((float) pxCount) * minMatch);
 	maxPosH = imgBig->width - imgSml->width + 1;
 	posCount = maxPosH * (imgBig->height - imgSml->height + 1);
 	posB = colB = matchScoreBest = 0;
 	for (i = 0; i < posCount; i++){
 		matchScore = CheckMatch(pxArrBig, pxArrSml, pxCount, posB + colB, imgSml->height, imgSml->width, matchScoreBest, imgBig->width);
 		//check if it's a better match and assign it if it is
-		if (matchScore > matchScoreBest) matchScoreBest = matchScore;
+		if (matchScore > matchMin){
+			matchScoreBest = matchMin = matchScore;
+			if (matchScoreBest == pxCount) break; //if the match score is the same as the number of pixels in the image, this is a perfect match and we can stop looking
+		}
 		//change the match position
 		colB++;
 		if (colB >= maxPosH){
