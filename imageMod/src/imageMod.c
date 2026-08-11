@@ -15,17 +15,18 @@ typedef struct sSplitArea{
 enum AREATYPE {ART_BORDER, ART_FIRST, ART_LAST};
 enum SPLITTYPE {SPT_NONE, SPT_HORIZONTAL, SPT_VERTICAL};
 //constant declarations
-static UBYTE trueColor[8][3] = {{0, 0, 0}, {255, 0, 0}, {0, 255, 0}, {0, 0, 255}, {255, 255, 0}, {255, 0, 255}, {0, 255, 255}, {255, 255, 255}};
-static UBYTE blackWhiteColor[2][3] = {{0, 0, 0}, {255, 255, 255}};
+static ColorItem trueColor[8] = {{0, 0, 0, 255}, {255, 0, 0, 255}, {0, 255, 0, 255}, {0, 0, 255, 255}, {255, 255, 0, 255}, {255, 0, 255, 255}, {0, 255, 255, 255}, {255, 255, 255, 255}};
+static ColorItem blackWhiteColor[2] = {{0, 0, 0, 255}, {255, 255, 255, 255}};
 //***** Function prototypes *****//
-static inline void GetColors(UBYTE* pixel, UBYTE* red, UBYTE* green, UBYTE* blue, UBYTE* maxRed, UBYTE* maxGreen, UBYTE* maxBlue);
+static inline void GetColors(UBYTE* pixel, ColorItem* color, ColorItem* colorInv);
 static inline void CompareColor(int* minDiff, int* colorId, int newColorId, UBYTE red, UBYTE green, UBYTE blue);
-static inline void SetColor(UBYTE* pixel, UBYTE* colorArr);
-static inline int ColorLine(UBYTE* bA, UBYTE* color, int width, int top, int left, int lineLen, int pxLen);
+static inline void SetColor(UBYTE* pixel, ColorItem color);
+static inline int ColorLine(UBYTE* bA, ColorItem* color, int width, int top, int left, int lineLen, int pxLen);
 static inline int FindSegments(char* relArr, Segment* segArr, int dimP, int dimS, int moveP, int moveS, int maxLen);
-static inline void ClearSegments(ImageData* img, Segment* segArr, int segCount, int pxLen, int move, UBYTE* backgroundColor);
+static inline void ClearSegments(ImageData* img, Segment* segArr, int segCount, int pxLen, int move, ColorItem* backgroundColor);
 static inline void BuildPixelArray(ImageData* img, uint32_t *pxArr, int ignoreAlpha);
 static inline int CheckMatch(uint32_t *pxArrA, uint32_t *pxArrB, int matchScore, int posStart, int height, int width, int threshold, int lineJump);
+static inline int GetColorList(uint32_t* pxArr, uint32_t* colorArr, int* colorPxArr, int pxCount);
 static inline void BuildColorMinima(int* colorPxArr, int* colorMinArr, int pxCount, int colorCountCheck, float precision);
 static inline int CheckAreaSplit(Area* area, int minSizeV, int minSizeH);
 static inline void BuildSplitArea(Area* area, SplitArea *splitArea, int splitType, int borderOffsetH, int borderOffsetV);
@@ -37,21 +38,21 @@ static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, 
 void ColorReduce(ImageData* img, int blackWhite){
 	//this function takes the given pixel array, and converts each pixel into a specific color it is closest to
 	int i, pixelCount, pxLen, minDiff, colorId;
-	UBYTE red, green, blue, maxRed, maxGreen, maxBlue;
+	ColorItem color, colorInv;
 	UBYTE* bA = img->bA;
 	//go through each pixel, and find which color is the closest
 	pixelCount = img->width * img->height;
-	pxLen = 3 + img->hasAlpha;
+	pxLen = (img->hasAlpha)? 4 : 3;
 	if (blackWhite){
 		//if this is a black and white comparison
 		for (i = 0; i < pixelCount; i++){
-			GetColors(bA, &red, &green, &blue, &maxRed, &maxGreen, &maxBlue);
+			GetColors(bA, &color, &colorInv);
 			//we look for the minimum difference between each color channel of the pixel and the reference colors
 			//by default we start with the assumption that the pixel color is black (0 red, 0 green, 0 blue)
 			colorId = 0;
-			minDiff = red + green + blue;
+			minDiff = color.red + color.green + color.blue;
 			//compare it with white
-			CompareColor(&minDiff, &colorId, 1, maxRed, maxGreen, maxBlue);
+			CompareColor(&minDiff, &colorId, 1, colorInv.red, colorInv.green, colorInv.blue);
 			//overwrite the pixel colors with the closest true color and shift to next pixel
 			SetColor(bA, blackWhiteColor[colorId]);
 			bA += pxLen;
@@ -59,19 +60,19 @@ void ColorReduce(ImageData* img, int blackWhite){
 	}
 	else {
 		for (i = 0; i < pixelCount; i++){
-			GetColors(bA, &red, &green, &blue, &maxRed, &maxGreen, &maxBlue);
+			GetColors(bA, &color, &colorInv);
 			//we look for the minimum difference between each color channel of the pixel and the reference colors
 			//by default we start with the assumption that the pixel color is black (0 red, 0 green, 0 blue)
 			colorId = 0;
-			minDiff = red + green + blue;
+			minDiff = color.red + color.green + color.blue;
 			//compare it with all other colors to find the closest match
-			CompareColor(&minDiff, &colorId, 1, maxRed, green, blue); //red
-			CompareColor(&minDiff, &colorId, 2, red, maxGreen, blue); //green
-			CompareColor(&minDiff, &colorId, 3, red, green, maxBlue); //blue
-			CompareColor(&minDiff, &colorId, 4, maxRed, maxGreen, blue); //yellow
-			CompareColor(&minDiff, &colorId, 5, maxRed, green, maxBlue); //purple
-			CompareColor(&minDiff, &colorId, 6, red, maxGreen, maxBlue); //cyan
-			CompareColor(&minDiff, &colorId, 7, maxRed, maxGreen, maxBlue); //white
+			CompareColor(&minDiff, &colorId, 1,  colorInv.red, color.green, color.blue); //red
+			CompareColor(&minDiff, &colorId, 2, color.red, colorInv.green, color.blue); //green
+			CompareColor(&minDiff, &colorId, 3, color.red, color.green, colorInv.blue); //blue
+			CompareColor(&minDiff, &colorId, 4, colorInv.red, colorInv.green, color.blue); //yellow
+			CompareColor(&minDiff, &colorId, 5, colorInv.red, color.green, colorInv.blue); //purple
+			CompareColor(&minDiff, &colorId, 6, color.red, colorInv.green, colorInv.blue); //cyan
+			CompareColor(&minDiff, &colorId, 7, colorInv.red, colorInv.green, colorInv.blue); //white
 			//overwrite the pixel colors with the closest true color and shift to next pixel
 			SetColor(bA, trueColor[colorId]);
 			bA += pxLen;
@@ -79,15 +80,10 @@ void ColorReduce(ImageData* img, int blackWhite){
 	}
  }
 
-static inline void GetColors(UBYTE* pixel, UBYTE* red, UBYTE* green, UBYTE* blue, UBYTE* maxRed, UBYTE* maxGreen, UBYTE* maxBlue){
+static inline void GetColors(UBYTE* pixel, ColorItem* color, ColorItem* colorInv){
 	//this function gets the colors and inverse colors for the current pixel
-	*red = pixel[0];
-	*green = pixel[1];
-	*blue = pixel[2];
-	//get all the differences
-	*maxRed = 255 - *red;
-	*maxGreen = 255 - *green;
-	*maxBlue = 255 - *blue;
+	*color = (ColorItem){.red = pixel[0], .green = pixel[1], .blue = pixel[2]};
+	*colorInv = (ColorItem){.red = 255 - pixel[0], .green = 255 - pixel[1], .blue = 255 - pixel[2]};
 }
 
 static inline void CompareColor(int* minDiff, int* colorId, int newColorId, UBYTE red, UBYTE green, UBYTE blue){
@@ -100,22 +96,22 @@ static inline void CompareColor(int* minDiff, int* colorId, int newColorId, UBYT
 	}
 }
 
-static inline void SetColor(UBYTE* pixel, UBYTE* colorArr){
+static inline void SetColor(UBYTE* pixel, ColorItem color){
 	//this function sets the selected color in the current pixel
-	pixel[0] = colorArr[0];
-	pixel[1] = colorArr[1];
-	pixel[2] = colorArr[2];
+	pixel[0] = color.red;
+	pixel[1] = color.green;
+	pixel[2] = color.blue;
 }
 
-void SplitColor(ImageData* img, UBYTE* baseColor, int* threshold, int colorCount, int isBackground){
+void SplitColor(ImageData* img, ColorItem* baseColor, int* threshold, int colorCount, int isBackground){
 	//this function takes the given pixel array, calculate the difference of each pixel to the base color, then make the pixle black or white depending on wheteher they are above or below the average difference
 	//we need an array to store the pixel difference and a variable to store the total difference
 	int i, j, pixelCount, pxLen, diff, totalDiff;
 	int *pixDiff, *thrDiff, *colIndexPx;
-	UBYTE repCol, otherCol, *pxPt, *colorPt;
+	UBYTE repCol, otherCol, *pxPt;
 	pixelCount = img->width * img->height;
 	totalDiff = 0;
-	pxLen = 3 + img->hasAlpha;
+	pxLen = (img->hasAlpha)? 4 : 3;
 	pixDiff = (int *) malloc(sizeof(int) * pixelCount);
 	thrDiff = (int *) malloc(sizeof(int) * colorCount);
 	colIndexPx = (int *) malloc(sizeof(int) * pixelCount);
@@ -123,17 +119,15 @@ void SplitColor(ImageData* img, UBYTE* baseColor, int* threshold, int colorCount
 	//go through each pixel, get the minimum difference to all the base colors, store it, and add it to the total
 	for (i = 0; i < pixelCount; i++){
 		pixDiff[i] = 765; //this is 255 times 3, the maximum color difference possible
-		colorPt = baseColor;
 		for (j = 0; j < colorCount; j++){
-			diff = (((pxPt[0] < colorPt[0])? (colorPt[0] - pxPt[0]) : (pxPt[0] - colorPt[0]))); //difference with red
-			diff += (((pxPt[1] < colorPt[1])? (colorPt[1] - pxPt[1]) : (pxPt[1] - colorPt[1]))); //difference with green
-			diff += (((pxPt[2] < colorPt[2])? (colorPt[2] - pxPt[2]) : (pxPt[2] - colorPt[2]))); //difference with blue
+			diff = (((pxPt[0] < baseColor[j].red)? (baseColor[j].red - pxPt[0]) : (pxPt[0] - baseColor[j].red))); //difference with red
+			diff += (((pxPt[1] < baseColor[j].green)? (baseColor[j].green - pxPt[1]) : (pxPt[1] - baseColor[j].green))); //difference with green
+			diff += (((pxPt[2] < baseColor[j].blue)? (baseColor[j].blue - pxPt[2]) : (pxPt[2] - baseColor[j].blue))); //difference with blue
 			//check if the total difference is less than the current pixel difference, and store it if it is, as well as the index of the current color
 			if (diff < pixDiff[i]){
 				pixDiff[i] = diff;
 				colIndexPx[i] = j;
 			}
-			colorPt += 3;
 		}
 		//add to the total difference
 		totalDiff += pixDiff[i];
@@ -162,31 +156,30 @@ void SplitColor(ImageData* img, UBYTE* baseColor, int* threshold, int colorCount
 	free((void *) colIndexPx);
 }
 
-void ColorReplace(ImageData* img, int ignoreAlpha, UBYTE* oldColor, UBYTE* newColor){
+void ColorReplace(ImageData* img, int ignoreAlpha, ColorItem* oldColor, ColorItem* newColor){
 	//this function goes through every pixel in the supplied image and replace the supplied old color with new one
 	int i, pixelCount, pos, pxLen;
 	pixelCount = img->width * img->height;
 	pos = 0;
 	if (img->hasAlpha && !ignoreAlpha){
 		for ( i = 0; i < pixelCount; i++){
-			if ((img->bA[pos] == oldColor[0]) && (img->bA[pos + 1] == oldColor[1]) && (img->bA[pos + 2] == oldColor[2]) && (img->bA[pos + 3] == oldColor[3])) memcpy(&img->bA[pos], newColor, 4);
+			if ((img->bA[pos] == oldColor->red) && (img->bA[pos + 1] == oldColor->green) && (img->bA[pos + 2] == oldColor->blue) && (img->bA[pos + 3] == oldColor->alpha)) memcpy(&img->bA[pos], newColor, 4);
 			pos += 4;
 		}
 	}
 	else {
-		pxLen = 3 + img->hasAlpha;
+		pxLen = (img->hasAlpha)? 4 : 3;
 		for ( i = 0; i < pixelCount; i++){
-			if ((img->bA[pos] == oldColor[0]) && (img->bA[pos + 1] == oldColor[1]) && (img->bA[pos + 2] == oldColor[2])) memcpy(&img->bA[pos], newColor, 3);
+			if ((img->bA[pos] == oldColor->red) && (img->bA[pos + 1] == oldColor->green) && (img->bA[pos + 2] == oldColor->blue)) memcpy(&img->bA[pos], newColor, 3);
 			pos += pxLen;
 		}
 	}
 }
 
-int FillSquareColor(ImageData* img, int sqx, int sqy, int sqw, int sqh, UBYTE *color){
+int FillSquareColor(ImageData* img, int sqx, int sqy, int sqw, int sqh, ColorItem* color){
 	//this function fills a square of the specified dimensions with the required color on the provided image
 	int i, pxLen, lineLen, pos, posStart, sqr, sqb;
-	UBYTE colorF[4];
-	pxLen = 3 + img->hasAlpha;
+	pxLen = (img->hasAlpha)? 4 : 3;
 	lineLen = (img->width * pxLen);
 	//exit if the square location puts it outside the image
 	sqr = sqx + sqw;
@@ -205,14 +198,8 @@ int FillSquareColor(ImageData* img, int sqx, int sqy, int sqw, int sqh, UBYTE *c
 	if (sqb > img->height) sqh = img->height - sqy;
 	//if the square fits, color it
 	//color first line
-	if (img->hasAlpha){
-		memcpy(colorF, color, 3);
-		colorF[3] = 255;
-		posStart = ColorLine(img->bA, colorF, sqw, sqy, sqx, lineLen, 4);
-	}
-	else {
-		posStart = ColorLine(img->bA, color, sqw, sqy, sqx, lineLen, 3);
-	}
+	color->alpha = 255; //make sure the color is completely opaque
+	posStart = ColorLine(img->bA, color, sqw, sqy, sqx, lineLen, (img->hasAlpha)? 4 : 3);
 	//copy first line onto the rest
 	pos = posStart;
 	for (i = 1; i < sqh; i++){
@@ -222,7 +209,7 @@ int FillSquareColor(ImageData* img, int sqx, int sqy, int sqw, int sqh, UBYTE *c
 	return 0;
 }
 
-static inline int ColorLine(UBYTE* bA, UBYTE* color, int width, int top, int left, int lineLen, int pxLen){
+static inline int ColorLine(UBYTE* bA, ColorItem* color, int width, int top, int left, int lineLen, int pxLen){
 	//this function colors a line of the specified width, with the specified coordinates, with the specified color
 	int i, pos, posStart;
 	pos = posStart = (top * lineLen) + (left * pxLen);
@@ -233,24 +220,17 @@ static inline int ColorLine(UBYTE* bA, UBYTE* color, int width, int top, int lef
 	return posStart;
 }
 
-void PadImage(ImageData* imgPad, ImageData* img, int pad, UBYTE* paddingColor){
+void PadImage(ImageData* imgPad, ImageData* img, int pad, ColorItem* paddingColor){
 	//this function padds the provided image and pads it by the requested value with the requested color
 	int i, j, pos, posS, pxLen, lineLen, lineLenP;
-	UBYTE paddingColorF[4];
 	imgPad->width = img->width + (pad * 2);
 	imgPad->height = img->height + (pad * 2);
-	pxLen = 3 + (imgPad->hasAlpha = img->hasAlpha);
+	pxLen = (imgPad->hasAlpha = img->hasAlpha)? 4 : 3;
 	lineLen = img->width * pxLen;
 	lineLenP = imgPad->width * pxLen;
 	//copy the padding color on every pixel of the first line of the padded image
-	if (imgPad->hasAlpha){
-		memcpy(paddingColorF, paddingColor, 3);
-		paddingColorF[3] = 255; //padding colors are always fully opaque
-		ColorLine(imgPad->bA, paddingColorF, imgPad->width, 0, 0, lineLenP, 4);
-	}
-	else {
-		ColorLine(imgPad->bA, paddingColor, imgPad->width, 0, 0, lineLenP, 3);
-	}
+	paddingColor->alpha = 255; //padding colors are always fully opaque
+	ColorLine(imgPad->bA, paddingColor, imgPad->width, 0, 0, lineLenP, (imgPad->hasAlpha)? 4 : 3);
 	//copy the first line onto all other lines to cover the entire padded image in padding color
 	pos = lineLenP;
 	for (i = 1; i < imgPad->height; i++){
@@ -272,7 +252,7 @@ void CopyArea(ImageData* imgCpy, ImageData* img, Area* area){
 	int i, pos, posC, pxLen, lineLen, lineLenC;
 	imgCpy->width = 1 + area->right - area->left;
 	imgCpy->height = 1 + area->bottom - area->top;
-	pxLen = 3 + (imgCpy->hasAlpha = img->hasAlpha);
+	pxLen = (imgCpy->hasAlpha = img->hasAlpha)? 4 : 3;
 	lineLen = img->width * pxLen;
 	lineLenC = imgCpy->width * pxLen;
 	//copy each line of the source onto the copy, within the width of the area
@@ -285,14 +265,14 @@ void CopyArea(ImageData* imgCpy, ImageData* img, Area* area){
     }
 }
 
-void EraseSegments(ImageData* img, int maxWidth, int maxHeight, UBYTE* backgroundColor){
+void EraseSegments(ImageData* img, int maxWidth, int maxHeight, ColorItem* backgroundColor){
 	//this function looks for all horizontal segments wider than the mex width and vertical segments higher than the max height and erases them
 	char *relArr;
 	int i, pos, imgSize, pxLen, segHCount, segVCount;
 	float imgSizeF;
 	Segment *segHArr, *segVArr;
 	imgSize = img->width * img->height;
-	pxLen = 3 + img->hasAlpha;
+	pxLen = (img->hasAlpha)? 4 : 3;
 	relArr = (char *) malloc(imgSize);
 	imgSizeF = (float) imgSize;
 	segHArr = (Segment *) malloc(sizeof(Segment) * ((int) (imgSizeF / ((float) maxWidth)) + 1));
@@ -300,7 +280,7 @@ void EraseSegments(ImageData* img, int maxWidth, int maxHeight, UBYTE* backgroun
 	//build the relevant pixel array
 	pos = 0;
 	for (i = 0; i < imgSize; i++){
-		relArr[i] = ((img->bA[pos] != backgroundColor[0]) && (img->bA[pos + 1] != backgroundColor[1]) && (img->bA[pos + 2] != backgroundColor[2]));
+		relArr[i] = ((img->bA[pos] != backgroundColor->red) && (img->bA[pos + 1] != backgroundColor->green) && (img->bA[pos + 2] != backgroundColor->blue));
 		pos += pxLen;
 	}
 	//go through the array and find all horizontal segments greater than the maximum width
@@ -345,21 +325,21 @@ static inline int FindSegments(char* relArr, Segment* segArr, int dimP, int dimS
 	return segCount;
 }
 
-static inline void ClearSegments(ImageData* img, Segment* segArr, int segCount, int pxLen, int move, UBYTE* backgroundColor){
+static inline void ClearSegments(ImageData* img, Segment* segArr, int segCount, int pxLen, int move, ColorItem* backgroundColor){
 	//this function replaces targeted segments with supplied background color
-	int i, j, k, pos;
+	int i, j, pos;
 	for (i = 0; i < segCount; i++){
 		pos = segArr[i].start * pxLen;
 		for (j = 0; j < segArr[i].length; j++){
-			for (k = 0; k < 3; k++){
-				img->bA[pos + k] = backgroundColor[k];
-			}
+			img->bA[pos] = backgroundColor->red;
+			img->bA[pos + 1] = backgroundColor->green;
+			img->bA[pos + 2] = backgroundColor->blue;
 			pos += move;
 		}
 	}
 }
 
-void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* backgroundColor){
+void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, ColorItem* backgroundColor){
 	//this function removes the lines in the provided image that are empty (have only pixels of the background color) after the specified maximum allowed
     int i, j, pos, posL, posR, pxLen, lineLen, lineCount, isFull;
 	//go through each line to check if the line is empty
@@ -371,7 +351,7 @@ void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* bac
 		pos = posL;
 		for (j = 0; j < img->width; j++){
 			//check for each pîxel in the line if the pixel color differs in any channel from the background color
-			if (isFull = ((img->bA[pos] != backgroundColor[0]) || (img->bA[pos + 1] != backgroundColor[1]) || (img->bA[pos + 2] != backgroundColor[2]))) break; //if it does, the line is not empty, move on
+			if (isFull = ((img->bA[pos] != backgroundColor->red) || (img->bA[pos + 1] != backgroundColor->green) || (img->bA[pos + 2] != backgroundColor->blue))) break; //if it does, the line is not empty, move on
 			pos += pxLen;
 		}
 		//if the current line is not empty, we must copy lines
@@ -445,7 +425,7 @@ static inline void BuildPixelArray(ImageData* img, uint32_t *pxArr, int ignoreAl
 	}
 	else {
 		//if the image does not have an alpha channel, or it is ignored in the comparison, copy the red, green, and blue channels to the pixel array and set the transparency channel to zero
-		pxLen = 3 + img->hasAlpha;
+		pxLen = (img->hasAlpha)? 4 : 3;
 		pxCount = img->width * img->height;
 		memset((char *) pxArr, 0, (pxCount * 4)); //set all bytes to zero
 		pos = 0;
@@ -483,10 +463,10 @@ int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData,
 	SplitArea *splitArea;
 	MatchData *mergeMatchData;
 	float pxCountF;
-	uint32_t *pxArrSml, *pxArrBig, colorArr[8], val32;
+	uint32_t *pxArrSml, *pxArrBig, colorArr[8];
 	//check that the small image is smaller in width and height than the big image
 	if ((imgSml->width > imgBig->width) || (imgSml->height > imgBig->height)) return 0;
-	//to speed up the search, build an array of 32 bit inetegers representing the pixels for both images
+	//to speed up the search, build an array of 32 bit integers representing the pixels for both images
 	pxCount = (imgSml->width * imgSml->height);
 	pxCountF = (float) pxCount;
 	pxArrSml = (uint32_t *) malloc(sizeof(uint32_t) * pxCount);
@@ -494,44 +474,7 @@ int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData,
 	pxArrBig = (uint32_t *) malloc(sizeof(uint32_t) * (imgBig->width * imgBig->height));
 	BuildPixelArray(imgBig, pxArrBig, ignoreAlpha);
 	//get the colors from the small image
-	colorCount = 0;
-	for (i = 0; i < pxCount; i++){
-		val = 0;
-		//look for the current pixel color in all the recorded colors
-		for (j = 0; j < colorCount; j++){
-			if (pxArrSml[i] == colorArr[j]){
-				//if it is found, increment the color pixel counter
-				val = 1;
-				colorPxArr[j]++;
-				break;
-			}
-		}
-		if (!val){
-			//if the pixel color was not found, add it to the recorded colors
-			colorArr[colorCount] = pxArrSml[i];
-			colorPxArr[colorCount++] = 1;
-		}
-	}
-	//reorganise the colors from most to least common
-	for(i = 1; i < colorCount; i++){
-		for (j = i - 1; j >= 0; j--){
-			//for each color, check that its pixel count is greater than the previous color
-			pos = j + 1;
-			if (colorPxArr[j] < colorPxArr[pos]){
-				//if it is, swap the color and color pixel counts
-				val = colorPxArr[j];
-				val32 = colorArr[j];
-				colorPxArr[j] = colorPxArr[pos];
-				colorArr[j] = colorArr[pos];
-				colorPxArr[pos] = val;
-				colorArr[pos] = val32;
-			}
-			else {
-				//if not, the colors are in order, move on to the next color
-				break;
-			}
-		}
-	}
+	colorCount = GetColorList(pxArrSml, colorArr, colorPxArr, pxCount);
 	colorCountC = (colorCheckCount && (colorCount > colorCheckCount))? colorCheckCount : colorCount;
 	//get the minimum horizontal and vertical sizes for splitting based on the size of the small image
 	minSizeH = (int) (((float) imgSml->width) * 2.5);
@@ -640,6 +583,52 @@ int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData,
 	free((void *) pxArrSml);
 	free((void *) pxArrBig);
 	return matchCount;
+}
+
+static inline int GetColorList(uint32_t* pxArr, uint32_t* colorArr, int* colorPxArr, int pxCount){
+	//this function finds all the colors in the supplied image and returns thir colors from most to least common
+	int i, j, pos, colorCount, val;
+	uint32_t val32;
+	//get the colors from the small image
+	colorCount = 0;
+	for (i = 0; i < pxCount; i++){
+		val = 0;
+		//look for the current pixel color in all the recorded colors
+		for (j = 0; j < colorCount; j++){
+			if (pxArr[i] == colorArr[j]){
+				//if it is found, increment the color pixel counter
+				val = 1;
+				colorPxArr[j]++;
+				break;
+			}
+		}
+		if (!val){
+			//if the pixel color was not found, add it to the recorded colors
+			colorArr[colorCount] = pxArr[i];
+			colorPxArr[colorCount++] = 1;
+		}
+	}
+	//reorganise the colors from most to least common
+	for (i = 1; i < colorCount; i++){
+		for (j = i - 1; j >= 0; j--){
+			//for each color, check that its pixel count is greater than the previous color
+			pos = j + 1;
+			if (colorPxArr[j] < colorPxArr[pos]){
+				//if it is, swap the color and color pixel counts
+				val = colorPxArr[j];
+				val32 = colorArr[j];
+				colorPxArr[j] = colorPxArr[pos];
+				colorArr[j] = colorArr[pos];
+				colorPxArr[pos] = val;
+				colorArr[pos] = val32;
+			}
+			else {
+				//if not, the colors are in order, move on to the next color
+				break;
+			}
+		}
+	}
+	return colorCount;
 }
 
 static inline void BuildColorMinima(int* colorPxArr, int* colorMinArr, int pxCount, int colorCountCheck, float precision){
@@ -784,17 +773,69 @@ static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, 
 	}
 }
 
-void GetRelevantArea(ImageData* img, Area* area, UBYTE* backgroundColor){
+int GetImageColors(ImageData* img, ColorItem* colorArr, int maxColor){
+	//this function gets the colors from the supplied image and returns them in the color list from most to least common up to the given maximum color count
+	int i, pxCount, colorCount;
+	int colorPxArr[8];
+	uint32_t *pxArr, colorArr32[8], val32;
+	//build an array of 32 bit integers representing the image pixels
+	pxCount = (img->width * img->height);
+	pxArr = (uint32_t *) malloc(sizeof(uint32_t) * pxCount);
+	BuildPixelArray(img, pxArr, 1);
+	//get the ordered color list from the small image
+	colorCount = GetColorList(pxArr, colorArr32, colorPxArr, pxCount);
+	//copy all the colors into the final color array
+	if (colorCount > maxColor) colorCount = maxColor;
+	for (i = 0; i < colorCount; i++){
+		memcpy((char *) &colorArr[i], (char *) &colorArr32[i], 4);
+	}
+	//clean up and return the color count
+	free((void *) pxArr);
+	return colorCount;
+}
+
+int CheckColorPresence(ImageData* img, ColorItem* colorArr, int colorCount, int ignoreAlpha){
+	//this function checks that the given colors are all presen in the supplied image
+	int i, j, pos, pxCount, pxLen, pxColorCount;
+	pxCount = (img->width * img->height);
+	pxLen = (img->hasAlpha)? 4 : 3;
+	//for each color, check that the image has at least one pixel of this color
+	if (img->hasAlpha && !ignoreAlpha){
+		for (i = 0; i < colorCount; i++){
+			//go through each pixel and stop as soon as one is found with the required color
+			pos = pxColorCount = 0;
+			for (j = 0; j < pxCount; j++){
+				pxColorCount += ((img->bA[pos] == colorArr[i].red) && (img->bA[pos + 1] == colorArr[i].green) && (img->bA[pos + 2] == colorArr[i].blue) && (img->bA[pos + 3] == colorArr[i].alpha));
+				pos += 4;
+			}
+			if (!pxColorCount) return 0; //if no pixel of the right color was found, immediately return negative result
+		}
+	}
+	else {
+		for (i = 0; i < colorCount; i++){
+			//go through each pixel and stop as soon as one is found with the required color
+			pos = pxColorCount = 0;
+			for (j = 0; j < pxCount; j++){
+				pxColorCount += ((img->bA[pos] == colorArr[i].red) && (img->bA[pos + 1] == colorArr[i].green) && (img->bA[pos + 2] == colorArr[i].blue));
+				pos += pxLen;
+			}
+			if (!pxColorCount) return 0; //if no pixel of the right color was found, immediately return negative result
+		}
+	}
+	return 1; //return positive result if all colors were found
+}
+
+void GetRelevantArea(ImageData* img, Area* area, ColorItem* backgroundColor){
 	//this function is used to get the dimensions of the area containing relevant pixels (different from the background color)
 	//go through every pixel and try to find the top bottom left and right pixels that differ from the background color
 	int i, j, pos, pxLen;
 	*area = (Area){.top = img->height, .bottom = -1, .left = img->width, .right = -1};
-	pxLen = 3 + img->hasAlpha;
+	pxLen = (img->hasAlpha)? 4 : 3;
 	pos = 0;
 	for (i = 0; i < img->height; i++){
 		for (j = 0; j < img->width; j++){
 			//check if the pixel is different from the background color (the alpha channelis not checked)
-			if ((img->bA[pos] != backgroundColor[0]) || (img->bA[pos + 1] != backgroundColor[1]) || (img->bA[pos + 2] != backgroundColor[2])){
+			if ((img->bA[pos] != backgroundColor->red) || (img->bA[pos + 1] != backgroundColor->green) || (img->bA[pos + 2] != backgroundColor->blue)){
 				//if the pixel is relevant, we see if it lies beyond the borders of the curent relevant area, and expand it if it does
 				if (i < area->top) area->top = i;
 				if (i > area->bottom) area->bottom = i;
@@ -806,18 +847,18 @@ void GetRelevantArea(ImageData* img, Area* area, UBYTE* backgroundColor){
 	}
 }
 
-int GetElementList(ImageData* img, Area* elList, UBYTE* backgroundColor, int dimH, int dimV){
+int GetElementList(ImageData* img, Area* elList, ColorItem* backgroundColor, int dimH, int dimV){
 	//this function goes through each pixel in the image and creates elements to group them together
 	int i, j, k, l, posP, pos, posC, pxLen, pixelCount, pxFound, elCount, len, maxH, maxV;
 	char *relPx, *zeroPx;
 	Area searchArea;
 	//build the relevant pixel array (pixels with a color different than the background)
-	pxLen = 3 + img->hasAlpha;
+	pxLen = (img->hasAlpha)? 4 : 3;
 	pixelCount = img->width * img->height;
 	relPx = malloc(pixelCount);
 	pos = 0;
 	for (i = 0; i < pixelCount; i++){
-		relPx[i] = ((img->bA[pos] != backgroundColor[0]) || (img->bA[pos + 1] != backgroundColor[1]) || (img->bA[pos + 2] != backgroundColor[2]));
+		relPx[i] = ((img->bA[pos] != backgroundColor->red) || (img->bA[pos + 1] != backgroundColor->green) || (img->bA[pos + 2] != backgroundColor->blue));
 		pos += pxLen;
 	}
 	//go through the relevant pixel array and create elements for each sets of pixels separated by less than the defined pad values

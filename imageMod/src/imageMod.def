@@ -9,5 +9,7 @@ EXPORTS
 	RemoveEmptyLines
 	PixelMatch
 	GetImagePosition
+	GetImageColors
+	CheckColorPresence
 	GetRelevantArea
 	GetElementList

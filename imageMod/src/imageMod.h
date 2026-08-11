@@ -24,16 +24,25 @@ typedef struct sMatchData{
 	float matchP; //match percentage
 } MatchData;
 
+typedef struct sColorItem{
+	UBYTE red;
+	UBYTE green;
+	UBYTE blue;
+	UBYTE alpha;
+} ColorItem;
+
 //***** function prototypes *****//
 void ColorReduce(ImageData* img, int blackWhite);
-void SplitColor(ImageData* img, UBYTE* baseColor, int* threshold, int colorCount, int isBackground);
-void ColorReplace(ImageData* img, int ignoreAlpha, UBYTE* oldColor, UBYTE* newColor);
-int FillSquareColor(ImageData* img, int sqx, int sqy, int sqw, int sqh, UBYTE* color);
-void PadImage(ImageData* imgPad, ImageData* img, int pad, UBYTE* paddingColor);
+void SplitColor(ImageData* img, ColorItem* baseColor, int* threshold, int colorCount, int isBackground);
+void ColorReplace(ImageData* img, int ignoreAlpha, ColorItem* oldColor, ColorItem* newColor);
+int FillSquareColor(ImageData* img, int sqx, int sqy, int sqw, int sqh, ColorItem* color);
+void PadImage(ImageData* imgPad, ImageData* img, int pad, ColorItem* paddingColor);
 void CopyArea(ImageData* imgCpy, ImageData* img, Area* area);
-void EraseSegments(ImageData* img, int maxWidth, int maxHeight, UBYTE* backgroundColor);
-void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, UBYTE* backgroundColor);
+void EraseSegments(ImageData* img, int maxWidth, int maxHeight, ColorItem* backgroundColor);
+void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, ColorItem* backgroundColor);
 float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha, float minMatch);
 int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData, int ignoreAlpha, float precision, int bestMatch, int merge, int colorCheckCount);
-void GetRelevantArea(ImageData* img, Area* area, UBYTE* backgroundColor);
-int GetElementList(ImageData* img, Area* elList, UBYTE* backgroundColor, int dimH, int dimV);
+int GetImageColors(ImageData* img, ColorItem* colorArr, int maxColor);
+int CheckColorPresence(ImageData* img, ColorItem* colorArr, int colorCount, int ignoreAlpha);
+void GetRelevantArea(ImageData* img, Area* area, ColorItem* backgroundColor);
+int GetElementList(ImageData* img, Area* elList, ColorItem* backgroundColor, int dimH, int dimV);

@@ -29,6 +29,13 @@ class MatchData(Structure):
 	def __repr__(self):
 		return f"{self.__class__.__name__}(top={self.a.top}, bottom={self.a.bottom}, left={self.a.left}, right={self.a.right}, matchP={self.matchP})"
 
+class ColorItem(Structure):
+	#this class represents an ColorItem structure in the shared library
+	_fields_ = [("red", c_ubyte), ("green", c_ubyte), ("blue", c_ubyte), ("alpha", c_ubyte)]
+
+	def __repr__(self):
+		return f"{self.__class__.__name__}(red={self.red}, green={self.green}, blue={self.blue}, alpha={self.alpha})"
+
 class ImageModSL:
 	#this class is used to access the functions in the shared library
 	def __init__(self, path = None):
@@ -63,19 +70,19 @@ class ImageModSL:
 			self.colorReduce.restype = None
 			#load the split color function
 			self.splitColor = self.SL.SplitColor
-			self.splitColor.argtypes = [POINTER(ImageData), POINTER(c_ubyte), POINTER(c_int), c_int, c_int]
+			self.splitColor.argtypes = [POINTER(ImageData), POINTER(ColorItem), POINTER(c_int), c_int, c_int]
 			self.splitColor.restype = None
 			#load the color replace function
 			self.colorReplace = self.SL.ColorReplace
-			self.colorReplace.argtypes = [POINTER(ImageData), c_int, POINTER(c_ubyte), POINTER(c_ubyte)]
+			self.colorReplace.argtypes = [POINTER(ImageData), c_int, POINTER(ColorItem), POINTER(ColorItem)]
 			self.colorReplace.restype = None
 			#load the fill square color function
 			self.fillSquareColor = self.SL.FillSquareColor
-			self.fillSquareColor.argtypes = [POINTER(ImageData), c_int, c_int, c_int, c_int, POINTER(c_ubyte)]
+			self.fillSquareColor.argtypes = [POINTER(ImageData), c_int, c_int, c_int, c_int, POINTER(ColorItem)]
 			self.fillSquareColor.restype = c_int
 			#load the pad image function
 			self.padImage = self.SL.PadImage
-			self.padImage.argtypes = [POINTER(ImageData), POINTER(ImageData), c_int, POINTER(c_ubyte)]
+			self.padImage.argtypes = [POINTER(ImageData), POINTER(ImageData), c_int, POINTER(ColorItem)]
 			self.padImage.restype = None
 			#load the copy area function
 			self.copyArea = self.SL.CopyArea
@@ -83,11 +90,11 @@ class ImageModSL:
 			self.copyArea.restype = None
 			#load the erase segments function
 			self.eraseSegments = self.SL.EraseSegments
-			self.eraseSegments.argtypes = [POINTER(ImageData), c_int, c_int, POINTER(c_ubyte)]
+			self.eraseSegments.argtypes = [POINTER(ImageData), c_int, c_int, POINTER(ColorItem)]
 			self.eraseSegments.restype = None
 			#load the remove empty lines function
 			self.removeEmptyLines = self.SL.RemoveEmptyLines
-			self.removeEmptyLines.argtypes = [POINTER(ImageData), POINTER(ImageData), c_int, POINTER(c_ubyte)]
+			self.removeEmptyLines.argtypes = [POINTER(ImageData), POINTER(ImageData), c_int, POINTER(ColorItem)]
 			self.removeEmptyLines.restype = None
 			#load the pixel match function
 			self.pixelMatch = self.SL.PixelMatch
@@ -97,11 +104,19 @@ class ImageModSL:
 			self.getImagePosition = self.SL.GetImagePosition
 			self.getImagePosition.argtypes = [POINTER(ImageData), POINTER(ImageData), POINTER(MatchData), c_int, c_float, c_int, c_int, c_int]
 			self.getImagePosition.restype = c_int
+			#load the get image colors function
+			self.getImageColors = self.SL.GetImageColors
+			self.getImageColors.argtypes = [POINTER(ImageData), POINTER(ColorItem), c_int]
+			self.getImageColors.restype = c_int
+			#load the check color presence function
+			self.checkColorPresence = self.SL.CheckColorPresence
+			self.checkColorPresence.argtypes = [POINTER(ImageData), POINTER(ColorItem), c_int, c_int]
+			self.checkColorPresence.restype = c_int
 			#load the relevant area function
 			self.getRelevantArea = self.SL.GetRelevantArea
-			self.getRelevantArea.argtypes = [POINTER(ImageData), POINTER(Area), POINTER(c_ubyte)]
+			self.getRelevantArea.argtypes = [POINTER(ImageData), POINTER(Area), POINTER(ColorItem)]
 			self.getRelevantArea.restype = None
 			#load the get element list function
 			self.getElementList = self.SL.GetElementList
-			self.getElementList.argtypes = [POINTER(ImageData), POINTER(Area), POINTER(c_ubyte), c_int, c_int]
+			self.getElementList.argtypes = [POINTER(ImageData), POINTER(Area), POINTER(ColorItem), c_int, c_int]
 			self.getElementList.restype = c_int
