@@ -12,7 +12,7 @@
 			"displayName": "ImageMod linux release",
 			"binaryDir": "${sourceDir}/build/l/r",
 			"installDir": "${sourceDir}/final/l/r",
-			"generator": "MinGW Makefiles",
+			"generator": "Unix Makefiles",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Release",
 				"CMAKE_C_COMPILER": "gcc",
@@ -36,10 +36,10 @@
 			"displayName": "ImageMod windows release",
 			"binaryDir": "${sourceDir}/build/w/r",
 			"installDir": "${sourceDir}/final/w/r",
+			"generator": "MinGW Makefiles",
 			"cacheVariables": {
 				"CMAKE_SYSTEM_NAME": "Windows",
-				"CMAKE_SYSTEM_VERSION": "5000",
-				"TARGET_WIN":"ON"
+				"CMAKE_SYSTEM_VERSION": "5000"
 			}
 		},
 		{

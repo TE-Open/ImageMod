@@ -1,0 +1,19 @@
+{
+	global:
+		ColorReduce;
+		SplitColor;
+		ColorReplace;
+		FillSquareColor;
+		PadImage;
+		CopyArea;
+		EraseSegments;
+		RemoveEmptyLines;
+		PixelMatch;
+		GetImagePosition;
+		GetImageColors;
+		CheckColorPresence;
+		GetRelevantArea;
+		GetElementList;
+	local:
+		*;
+};
