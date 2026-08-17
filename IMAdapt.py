@@ -22,6 +22,10 @@ class Area(Structure):
 	def __repr__(self):
 		return f"{self.__class__.__name__}(top={self.top}, bottom={self.bottom}, left={self.left}, right={self.right})"
 
+	def getOffset(self, x, y):
+		#this function returns an area that is a copy of itself offset by the given horizontal and vertical distances (x and y)
+		return Area(top = self.top + y, bottom = self.bottom + y, left = self.left + x, right = self.right + x)
+
 class MatchData(Structure):
 	#this class represents an MatchData structure in the shared library
 	_fields_ = [("a", Area), ("matchP", c_float)]
