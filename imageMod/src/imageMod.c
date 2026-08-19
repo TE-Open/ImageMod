@@ -15,7 +15,8 @@ typedef struct sSplitArea{
 enum AREATYPE {ART_BORDER, ART_FIRST, ART_LAST};
 enum SPLITTYPE {SPT_NONE, SPT_HORIZONTAL, SPT_VERTICAL};
 //constant declarations
-static ColorItem trueColor[8] = {{0, 0, 0, 255}, {255, 0, 0, 255}, {0, 255, 0, 255}, {0, 0, 255, 255}, {255, 255, 0, 255}, {255, 0, 255, 255}, {0, 255, 255, 255}, {255, 255, 255, 255}};
+#define SIMPLE_COLOR_COUNT 8
+static ColorItem simpleColor[SIMPLE_COLOR_COUNT] = {{0, 0, 0, 255}, {255, 0, 0, 255}, {0, 255, 0, 255}, {0, 0, 255, 255}, {255, 255, 0, 255}, {255, 0, 255, 255}, {0, 255, 255, 255}, {255, 255, 255, 255}};
 static ColorItem blackWhiteColor[2] = {{0, 0, 0, 255}, {255, 255, 255, 255}};
 //***** Function prototypes *****//
 static inline void GetColors(UBYTE* pixel, ColorItem* color, ColorItem* colorInv);
@@ -34,6 +35,8 @@ static inline int CheckColor(uint32_t* pxArr, uint32_t* colorArr, int* colorMaxA
 static inline int FindBestMatch(Area* area, ImageData* img, uint32_t* pxArrSml, uint32_t* pxArrBig, MatchData* matchData, int* matchCount, int threshold, int pxCount, int lineJump);
 static inline void FindAllMatches(Area* area, ImageData* img, uint32_t* pxArrSml, uint32_t* pxArrBig, MatchData* matchData, int* matchCount, int threshold, int pxCount, int lineJump);
 static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, int posChange);
+static inline int GetArrayColorPixelCountAlpha(UBYTE* pxArr, ColorItem* color, int pxCount);
+static inline int GetArrayColorPixelCount(UBYTE* pxArr, ColorItem* color, int pxCount, int pxLen);
 
 void ColorReduce(ImageData* img, int blackWhite){
 	//this function takes the given pixel array, and converts each pixel into a specific color it is closest to
@@ -74,7 +77,7 @@ void ColorReduce(ImageData* img, int blackWhite){
 			CompareColor(&minDiff, &colorId, 6, color.red, colorInv.green, colorInv.blue); //cyan
 			CompareColor(&minDiff, &colorId, 7, colorInv.red, colorInv.green, colorInv.blue); //white
 			//overwrite the pixel colors with the closest true color and shift to next pixel
-			SetColor(bA, trueColor[colorId]);
+			SetColor(bA, simpleColor[colorId]);
 			bA += pxLen;
 		}
 	}
@@ -458,12 +461,12 @@ int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData,
 	//this function tries to find the small image in the big image with the given precision (percentage of matching pixels)
 	int i, j, pos, pxCount, threshold, matchCount, mergeMatchCount, isMatch, colorCount, colorCountC, val;
 	int minSizeH, minSizeV, borderOffsetH, borderOffsetV, splitIndex;
-	int colorPxArr[8], colorMinArr[8];
+	int colorPxArr[SIMPLE_COLOR_COUNT], colorMinArr[SIMPLE_COLOR_COUNT];
 	Area area, *areaP;
 	SplitArea *splitArea;
 	MatchData *mergeMatchData;
 	float pxCountF;
-	uint32_t *pxArrSml, *pxArrBig, colorArr[8];
+	uint32_t *pxArrSml, *pxArrBig, colorArr[SIMPLE_COLOR_COUNT];
 	//check that the small image is smaller in width and height than the big image
 	if ((imgSml->width > imgBig->width) || (imgSml->height > imgBig->height)) return 0;
 	//to speed up the search, build an array of 32 bit integers representing the pixels for both images
@@ -776,8 +779,8 @@ static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, 
 int GetImageColors(ImageData* img, ColorItem* colorArr, int maxColor){
 	//this function gets the colors from the supplied image and returns them in the color list from most to least common up to the given maximum color count
 	int i, pxCount, colorCount;
-	int colorPxArr[8];
-	uint32_t *pxArr, colorArr32[8], val32;
+	int colorPxArr[SIMPLE_COLOR_COUNT];
+	uint32_t *pxArr, colorArr32[SIMPLE_COLOR_COUNT], val32;
 	//build an array of 32 bit integers representing the image pixels
 	pxCount = (img->width * img->height);
 	pxArr = (uint32_t *) malloc(sizeof(uint32_t) * pxCount);
@@ -796,33 +799,60 @@ int GetImageColors(ImageData* img, ColorItem* colorArr, int maxColor){
 
 int CheckColorPresence(ImageData* img, ColorItem* colorArr, int colorCount, int ignoreAlpha){
 	//this function checks that the given colors are all presen in the supplied image
-	int i, j, pos, pxCount, pxLen, pxColorCount;
+	int i, pxCount, pxLen, pxColorCount;
 	pxCount = (img->width * img->height);
-	pxLen = (img->hasAlpha)? 4 : 3;
 	//for each color, check that the image has at least one pixel of this color
 	if (img->hasAlpha && !ignoreAlpha){
 		for (i = 0; i < colorCount; i++){
 			//go through each pixel and stop as soon as one is found with the required color
-			pos = pxColorCount = 0;
-			for (j = 0; j < pxCount; j++){
-				pxColorCount += ((img->bA[pos] == colorArr[i].red) && (img->bA[pos + 1] == colorArr[i].green) && (img->bA[pos + 2] == colorArr[i].blue) && (img->bA[pos + 3] == colorArr[i].alpha));
-				pos += 4;
-			}
+			pxColorCount = GetArrayColorPixelCountAlpha(img->bA, &colorArr[i], pxCount);
 			if (!pxColorCount) return 0; //if no pixel of the right color was found, immediately return negative result
 		}
 	}
 	else {
+		pxLen = (img->hasAlpha)? 4 : 3;
 		for (i = 0; i < colorCount; i++){
 			//go through each pixel and stop as soon as one is found with the required color
-			pos = pxColorCount = 0;
-			for (j = 0; j < pxCount; j++){
-				pxColorCount += ((img->bA[pos] == colorArr[i].red) && (img->bA[pos + 1] == colorArr[i].green) && (img->bA[pos + 2] == colorArr[i].blue));
-				pos += pxLen;
-			}
+			pxColorCount = GetArrayColorPixelCount(img->bA, &colorArr[i], pxCount, pxLen);
 			if (!pxColorCount) return 0; //if no pixel of the right color was found, immediately return negative result
 		}
 	}
 	return 1; //return positive result if all colors were found
+}
+
+static inline int GetArrayColorPixelCountAlpha(UBYTE* pxArr, ColorItem* color, int pxCount){
+	//this function returns the count of pixels of the given color in the given pixel array, checking the alpha channel
+	int i, pxColorCount;
+	pxColorCount = 0;
+	for (i = 0; i < pxCount; i++){
+		pxColorCount += ((pxArr[0] == color->red) && (pxArr[1] == color->green) && (pxArr[2] == color->blue) && (pxArr[3] == color->alpha));
+		pxArr += 4;
+	}
+	return pxColorCount;
+}
+
+static inline int GetArrayColorPixelCount(UBYTE* pxArr, ColorItem* color, int pxCount, int pxLen){
+	//this function returns the count of pixels of the given color in the given pixel array, ignoring the alpha channel if there is one
+	int i, pxColorCount;
+	pxColorCount = 0;
+	for (i = 0; i < pxCount; i++){
+		pxColorCount += ((pxArr[0] == color->red) && (pxArr[1] == color->green) && (pxArr[2] == color->blue));
+		pxArr += pxLen;
+	}
+	return pxColorCount;
+}
+
+int GetColorPixelCount(ImageData* img, ColorItem* color, int ignoreAlpha){
+	//this function returns the count of pixels of the given color in the supplied image
+	int pxColorCount;
+	//for each color, check that the image has at least one pixel of this color
+	if (img->hasAlpha && !ignoreAlpha){
+		pxColorCount = GetArrayColorPixelCountAlpha(img->bA, color, (img->width * img->height));
+	}
+	else {
+		pxColorCount = GetArrayColorPixelCount(img->bA, color, (img->width * img->height), (img->hasAlpha)? 4 : 3);
+	}
+	return pxColorCount;
 }
 
 void GetRelevantArea(ImageData* img, Area* area, ColorItem* backgroundColor){

@@ -120,6 +120,10 @@ class ImageModSL:
 			self.checkColorPresence = self.SL.CheckColorPresence
 			self.checkColorPresence.argtypes = [POINTER(ImageData), POINTER(ColorItem), c_int, c_int]
 			self.checkColorPresence.restype = c_int
+			#load the get color pixel count function
+			self.getColorPixelCount = self.SL.GetColorPixelCount
+			self.getColorPixelCount.argtypes = [POINTER(ImageData), POINTER(ColorItem), c_int]
+			self.getColorPixelCount.restype = c_int
 			#load the relevant area function
 			self.getRelevantArea = self.SL.GetRelevantArea
 			self.getRelevantArea.argtypes = [POINTER(ImageData), POINTER(Area), POINTER(ColorItem)]

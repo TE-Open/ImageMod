@@ -12,6 +12,7 @@
 		GetImagePosition;
 		GetImageColors;
 		CheckColorPresence;
+		GetColorPixelCount;
 		GetRelevantArea;
 		GetElementList;
 	local:
