@@ -33,6 +33,10 @@ class MatchData(Structure):
 	def __repr__(self):
 		return f"{self.__class__.__name__}(top={self.a.top}, bottom={self.a.bottom}, left={self.a.left}, right={self.a.right}, matchP={self.matchP})"
 
+	def getArrayIP(imgDSml, imgDBig):
+		#this function returns an array of MatchData objects large enough to use in the ImageMod library GetImagePosition function given the supplied ImageData objects
+		return (MatchData * (3 * (1 + int(imgDBig.width / imgDSml.width)) * (1 + int(imgDBig.height / imgDSml.height))))()
+
 class ColorItem(Structure):
 	#this class represents an ColorItem structure in the shared library
 	_fields_ = [("red", c_ubyte), ("green", c_ubyte), ("blue", c_ubyte), ("alpha", c_ubyte)]
