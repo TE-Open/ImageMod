@@ -1,4 +1,5 @@
 EXPORTS
+	SimpleColorReduce
 	ColorReduce
 	SplitColor
 	ColorReplace

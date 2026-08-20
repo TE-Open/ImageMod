@@ -32,7 +32,8 @@ typedef struct sColorItem{
 } ColorItem;
 
 //***** function prototypes *****//
-void ColorReduce(ImageData* img, int blackWhite);
+void SimpleColorReduce(ImageData* img, int blackWhite);
+void ColorReduce(ImageData* img, ColorItem* colorArr, int colorCount);
 void SplitColor(ImageData* img, ColorItem* baseColor, int* threshold, int colorCount, int isBackground);
 void ColorReplace(ImageData* img, int ignoreAlpha, ColorItem* oldColor, ColorItem* newColor);
 int FillSquareColor(ImageData* img, int sqx, int sqy, int sqw, int sqh, ColorItem* color);

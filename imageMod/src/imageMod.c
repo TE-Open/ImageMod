@@ -2,6 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 //***** type definitions *****//
+typedef struct sColorIndex{
+	int red;
+	int green;
+	int blue;
+} ColorIndex;
+
 typedef struct sSegment{
 	int start;
 	int length;
@@ -12,16 +18,17 @@ typedef struct sSplitArea{
 	int currentPos;
 } SplitArea;
 
+enum COLORPART {COL_RED, COL_GREEN, COL_BLUE};
 enum AREATYPE {ART_BORDER, ART_FIRST, ART_LAST};
 enum SPLITTYPE {SPT_NONE, SPT_HORIZONTAL, SPT_VERTICAL};
 //constant declarations
-#define SIMPLE_COLOR_COUNT 8
-static ColorItem simpleColor[SIMPLE_COLOR_COUNT] = {{0, 0, 0, 255}, {255, 0, 0, 255}, {0, 255, 0, 255}, {0, 0, 255, 255}, {255, 255, 0, 255}, {255, 0, 255, 255}, {0, 255, 255, 255}, {255, 255, 255, 255}};
+#define SIMPLE_COLOR_COUNT 9
+static ColorItem simpleColor[SIMPLE_COLOR_COUNT] = {{0, 0, 0, 255}, {255, 0, 0, 255}, {0, 255, 0, 255}, {0, 0, 255, 255}, {255, 255, 0, 255}, {255, 0, 255, 255}, {0, 255, 255, 255}, {255, 255, 255, 255}, {127, 127, 127, 255}};
 static ColorItem blackWhiteColor[2] = {{0, 0, 0, 255}, {255, 255, 255, 255}};
 //***** Function prototypes *****//
-static inline void GetColors(UBYTE* pixel, ColorItem* color, ColorItem* colorInv);
-static inline void CompareColor(int* minDiff, int* colorId, int newColorId, UBYTE red, UBYTE green, UBYTE blue);
-static inline void SetColor(UBYTE* pixel, ColorItem color);
+static inline void ReduceColor(ImageData* img, ColorItem* colorArr, int colorCount);
+static inline int GetColorValueIndex(UBYTE* colValArr, UBYTE colVal, int* colValCount);
+static inline void GetColorDifference(UBYTE* colValArr, UBYTE* colDiffArr, UBYTE colVal, int colValCount);
 static inline int ColorLine(UBYTE* bA, ColorItem* color, int width, int top, int left, int lineLen, int pxLen);
 static inline int FindSegments(char* relArr, Segment* segArr, int dimP, int dimS, int moveP, int moveS, int maxLen);
 static inline void ClearSegments(ImageData* img, Segment* segArr, int segCount, int pxLen, int move, ColorItem* backgroundColor);
@@ -38,72 +45,97 @@ static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, 
 static inline int GetArrayColorPixelCountAlpha(UBYTE* pxArr, ColorItem* color, int pxCount);
 static inline int GetArrayColorPixelCount(UBYTE* pxArr, ColorItem* color, int pxCount, int pxLen);
 
-void ColorReduce(ImageData* img, int blackWhite){
-	//this function takes the given pixel array, and converts each pixel into a specific color it is closest to
-	int i, pixelCount, pxLen, minDiff, colorId;
-	ColorItem color, colorInv;
-	UBYTE* bA = img->bA;
-	//go through each pixel, and find which color is the closest
-	pixelCount = img->width * img->height;
-	pxLen = (img->hasAlpha)? 4 : 3;
+void SimpleColorReduce(ImageData* img, int blackWhite){
+	//this function takes the given image, and converts each pixel to the simple color it is closest to
+	ColorItem *colorArr;
+	int colorCount;
 	if (blackWhite){
-		//if this is a black and white comparison
-		for (i = 0; i < pixelCount; i++){
-			GetColors(bA, &color, &colorInv);
-			//we look for the minimum difference between each color channel of the pixel and the reference colors
-			//by default we start with the assumption that the pixel color is black (0 red, 0 green, 0 blue)
-			colorId = 0;
-			minDiff = color.red + color.green + color.blue;
-			//compare it with white
-			CompareColor(&minDiff, &colorId, 1, colorInv.red, colorInv.green, colorInv.blue);
-			//overwrite the pixel colors with the closest true color and shift to next pixel
-			SetColor(bA, blackWhiteColor[colorId]);
-			bA += pxLen;
-		}
+		colorArr = blackWhiteColor;
+		colorCount = 2;
 	}
 	else {
-		for (i = 0; i < pixelCount; i++){
-			GetColors(bA, &color, &colorInv);
-			//we look for the minimum difference between each color channel of the pixel and the reference colors
-			//by default we start with the assumption that the pixel color is black (0 red, 0 green, 0 blue)
-			colorId = 0;
-			minDiff = color.red + color.green + color.blue;
-			//compare it with all other colors to find the closest match
-			CompareColor(&minDiff, &colorId, 1,  colorInv.red, color.green, color.blue); //red
-			CompareColor(&minDiff, &colorId, 2, color.red, colorInv.green, color.blue); //green
-			CompareColor(&minDiff, &colorId, 3, color.red, color.green, colorInv.blue); //blue
-			CompareColor(&minDiff, &colorId, 4, colorInv.red, colorInv.green, color.blue); //yellow
-			CompareColor(&minDiff, &colorId, 5, colorInv.red, color.green, colorInv.blue); //purple
-			CompareColor(&minDiff, &colorId, 6, color.red, colorInv.green, colorInv.blue); //cyan
-			CompareColor(&minDiff, &colorId, 7, colorInv.red, colorInv.green, colorInv.blue); //white
-			//overwrite the pixel colors with the closest true color and shift to next pixel
-			SetColor(bA, simpleColor[colorId]);
-			bA += pxLen;
-		}
+		colorArr = simpleColor;
+		colorCount = SIMPLE_COLOR_COUNT;
 	}
+	ReduceColor(img, colorArr, colorCount);
  }
 
-static inline void GetColors(UBYTE* pixel, ColorItem* color, ColorItem* colorInv){
-	//this function gets the colors and inverse colors for the current pixel
-	*color = (ColorItem){.red = pixel[0], .green = pixel[1], .blue = pixel[2]};
-	*colorInv = (ColorItem){.red = 255 - pixel[0], .green = 255 - pixel[1], .blue = 255 - pixel[2]};
-}
+void ColorReduce(ImageData* img, ColorItem* colorArr, int colorCount){
+	//this function takes the given image, and converts each pixel to the provided color it is closest to
+	ReduceColor(img, colorArr, colorCount);
+ }
 
-static inline void CompareColor(int* minDiff, int* colorId, int newColorId, UBYTE red, UBYTE green, UBYTE blue){
-	//this function compare the current minimum color difference with a color difference with the given color
-	int diff = (int) (red + green + blue);
-	if (diff < *minDiff){
-		//if the new color difference is less than the prvious minimum color difference, it becomes the new minimum color difference
-		*minDiff = diff;
-		*colorId = newColorId;
+static inline void ReduceColor(ImageData* img, ColorItem* colorArr, int colorCount){
+	//this function reduces the color in the given image to the colors in the array
+	int i, j, pixelCount, pxLen, diff, minDiff, colorId;
+	int colValCount[3];
+	UBYTE *colValArr[3], *colDiffArr[3], *pxArr;
+	ColorIndex *colorIndexArr;
+	pixelCount = img->width * img->height;
+	pxLen = (img->hasAlpha)? 4 : 3;
+	//set up the combined color value arrays and get the color value index for the provided colors
+	for (i = 0; i < 3; i++){
+		colValArr[i] = (UBYTE *) malloc(colorCount);
+		colDiffArr[i] = (UBYTE *) malloc(colorCount);
 	}
+	colorIndexArr = (ColorIndex *) malloc(sizeof(ColorIndex) * colorCount);
+	colValCount[COL_RED] = colValCount[COL_GREEN] = colValCount[COL_BLUE] = 0;
+	for (i = 0; i < colorCount; i++){
+		colorIndexArr[i].red = GetColorValueIndex(colValArr[COL_RED], colorArr[i].red, &colValCount[COL_RED]);
+		colorIndexArr[i].green = GetColorValueIndex(colValArr[COL_GREEN], colorArr[i].green, &colValCount[COL_GREEN]);
+		colorIndexArr[i].blue = GetColorValueIndex(colValArr[COL_BLUE], colorArr[i].blue, &colValCount[COL_BLUE]);
+	}
+	//for each pixel in the image, get the color most similar to it and recolor the pixel
+	pxArr = img->bA;
+	for (i = 0; i < pixelCount; i++){
+		//first get the differences between the pixel color values (red, green, and blue) and all the color values in the color value arrays
+		GetColorDifference(colValArr[COL_RED], colDiffArr[COL_RED], pxArr[COL_RED], colValCount[COL_RED]);
+		GetColorDifference(colValArr[COL_GREEN], colDiffArr[COL_GREEN], pxArr[COL_GREEN], colValCount[COL_GREEN]);
+		GetColorDifference(colValArr[COL_BLUE], colDiffArr[COL_BLUE], pxArr[COL_BLUE], colValCount[COL_BLUE]);
+		//for each color calculate the difference with the current pixel, and keep the minimum
+		minDiff = 765;
+		colorId = 0;
+		for (j = 0; j < colorCount; j++){
+			diff = colDiffArr[COL_RED][colorIndexArr[j].red] + colDiffArr[COL_GREEN][colorIndexArr[j].green] + colDiffArr[COL_BLUE][colorIndexArr[j].blue];
+			if (diff < minDiff){
+				minDiff = diff;
+				colorId = j;
+			}
+		}
+		//fill the pixel with the new color
+		pxArr[COL_RED] = colorArr[colorId].red;
+		pxArr[COL_GREEN] = colorArr[colorId].green;
+		pxArr[COL_BLUE] = colorArr[colorId].blue;
+		pxArr += pxLen;
+	}
+	//clean up
+	for (i = 0; i < 3; i++){
+		free((void *) colValArr[i]);
+		free((void *) colDiffArr[i]);
+	}
+	free((void *) colorIndexArr);
 }
 
-static inline void SetColor(UBYTE* pixel, ColorItem color){
-	//this function sets the selected color in the current pixel
-	pixel[0] = color.red;
-	pixel[1] = color.green;
-	pixel[2] = color.blue;
+static inline int GetColorValueIndex(UBYTE* colValArr, UBYTE colVal, int* colValCount){
+	//this function attempts to find the color value in the color value array, and either returns the index where it was found or adds it if it was not
+	int i;
+	for (i = 0; i < *colValCount; i++){
+		if (colValArr[i] == colVal) break;
+	}
+	if (i == *colValCount){
+		//if the color value was not found, add it
+		colValArr[i] = colVal;
+		(*colValCount)++;
+	}
+	return i;
+}
+
+static inline void GetColorDifference(UBYTE* colValArr, UBYTE* colDiffArr, UBYTE colVal, int colValCount){
+	//this function calculates the difference between the color value and all color values in the color value array and stores it in the difference array
+	int i;
+	for (i = 0; i < colValCount; i++){
+		colDiffArr[i] = (colVal > colValArr[i])? (colVal - colValArr[i]) : (colValArr[i] - colVal);
+	}
 }
 
 void SplitColor(ImageData* img, ColorItem* baseColor, int* threshold, int colorCount, int isBackground){

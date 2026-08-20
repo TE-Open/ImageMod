@@ -72,9 +72,13 @@ class ImageModSL:
 			self.isValid = True
 		#if the shared library was successfully loaded, we specify the return types and arguments for the various functions
 		if self.isValid:
+			#load the simple color reduce function
+			self.simpleColorReduce = self.SL.SimpleColorReduce
+			self.simpleColorReduce.argtypes = [POINTER(ImageData), c_int]
+			self.simpleColorReduce.restype = None
 			#load the color reduce function
 			self.colorReduce = self.SL.ColorReduce
-			self.colorReduce.argtypes = [POINTER(ImageData), c_int]
+			self.colorReduce.argtypes = [POINTER(ImageData), POINTER(ColorItem), c_int]
 			self.colorReduce.restype = None
 			#load the split color function
 			self.splitColor = self.SL.SplitColor
