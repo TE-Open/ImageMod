@@ -42,6 +42,7 @@ static inline int CheckColor(uint32_t* pxArr, uint32_t* colorArr, int* colorMaxA
 static inline int FindBestMatch(Area* area, ImageData* img, uint32_t* pxArrSml, uint32_t* pxArrBig, MatchData* matchData, int* matchCount, int threshold, int pxCount, int lineJump);
 static inline void FindAllMatches(Area* area, ImageData* img, uint32_t* pxArrSml, uint32_t* pxArrBig, MatchData* matchData, int* matchCount, int threshold, int pxCount, int lineJump);
 static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, int posChange);
+static inline int GetOrderedColorPixels(ImageData* img, ColorItem* colorArr, int* colorPxArr, int maxColor);
 static inline int GetArrayColorPixelCountAlpha(UBYTE* pxArr, ColorItem* color, int pxCount);
 static inline int GetArrayColorPixelCount(UBYTE* pxArr, ColorItem* color, int pxCount, int pxLen);
 
@@ -810,8 +811,22 @@ static inline void MoveSearchColumn(int* col, int* line, int* pos, int maxPosH, 
 
 int GetImageColors(ImageData* img, ColorItem* colorArr, int maxColor){
 	//this function gets the colors from the supplied image and returns them in the color list from most to least common up to the given maximum color count
-	int i, pxCount, colorCount;
 	int colorPxArr[SIMPLE_COLOR_COUNT];
+	return GetOrderedColorPixels(img, colorArr, colorPxArr, maxColor);
+}
+
+int GetImageColorPixels(ImageData* img, ColorItem* colorArr, int* colorPxArr, int maxColor){
+	//this function gets the colors from the supplied image and returns them as well as their total pixel count from most to least common up to the given maximum color count
+	int colorCount;
+	int colorPxArrF[SIMPLE_COLOR_COUNT];
+	colorCount = GetOrderedColorPixels(img, colorArr, colorPxArrF, maxColor);
+	memcpy((char *) colorPxArr, (char *) colorPxArrF, sizeof(int) * colorCount); //copy the color pixels counts into the final pixel array
+	return colorCount;
+}
+
+static inline int GetOrderedColorPixels(ImageData* img, ColorItem* colorArr, int* colorPxArr, int maxColor){
+	//this function returns the ordered list of colors with their associated pixel count from the supplied image
+	int i, pxCount, colorCount;
 	uint32_t *pxArr, colorArr32[SIMPLE_COLOR_COUNT], val32;
 	//build an array of 32 bit integers representing the image pixels
 	pxCount = (img->width * img->height);

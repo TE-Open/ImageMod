@@ -44,6 +44,7 @@ void RemoveEmptyLines(ImageData* imgRm, ImageData* img, int maxLines, ColorItem*
 float PixelMatch(ImageData* imgSml, ImageData* imgBig, int ignoreAlpha, float minMatch);
 int GetImagePosition(ImageData* imgSml, ImageData* imgBig, MatchData* matchData, int ignoreAlpha, float precision, int bestMatch, int merge, int colorCheckCount);
 int GetImageColors(ImageData* img, ColorItem* colorArr, int maxColor);
+int GetImageColorPixels(ImageData* img, ColorItem* colorArr, int* colorPxArr, int maxColor);
 int CheckColorPresence(ImageData* img, ColorItem* colorArr, int colorCount, int ignoreAlpha);
 int GetColorPixelCount(ImageData* img, ColorItem* color, int ignoreAlpha);
 void GetRelevantArea(ImageData* img, Area* area, ColorItem* backgroundColor);

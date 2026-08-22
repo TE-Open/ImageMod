@@ -12,6 +12,7 @@
 		PixelMatch;
 		GetImagePosition;
 		GetImageColors;
+		GetImageColorPixels;
 		CheckColorPresence;
 		GetColorPixelCount;
 		GetRelevantArea;
