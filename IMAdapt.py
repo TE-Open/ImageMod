@@ -44,6 +44,9 @@ class ColorItem(Structure):
 	def __repr__(self):
 		return f"{self.__class__.__name__}(red={self.red}, green={self.green}, blue={self.blue}, alpha={self.alpha})"
 
+	def __eq__(self, color):
+		return ((self.red == color.red) and (self.green == color.green) and (self.blue == color.blue) and (self.alpha == color.alpha))
+
 class ImageModSL:
 	#this class is used to access the functions in the shared library
 	def __init__(self, path = None):
