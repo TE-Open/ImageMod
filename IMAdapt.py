@@ -64,7 +64,7 @@ class ImageModSL:
 		#try to load the shared library from either path
 		try:
 			self.SL = CDLL(path)
-		except FileNotFoundError:
+		except FileNotFoundError, OSError:
 			self.SL = CDLL(os.path.join(baseDir, libname))
 		#if the shared library was successfully loaded, we specify the return types and arguments for the various functions
 		#load the simple color reduce function
