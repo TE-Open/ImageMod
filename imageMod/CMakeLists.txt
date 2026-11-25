@@ -24,6 +24,8 @@ endif()
 
 set_target_properties(ImageMod PROPERTIES PREFIX "")
 
+target_link_options(ImageMod PRIVATE $<$<CONFIG:Release>:-s>)
+
 install(
 	TARGETS ImageMod
 	FILE_SET HEADERS
