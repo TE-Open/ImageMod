@@ -1,5 +1,5 @@
 from collections.abc import Callable as Callable
-from ctypes import Array, CDLL, Structure, _Pointer, c_float, c_int
+from ctypes import Array, CDLL, Structure, c_float, c_int
 
 class ImageData(Structure):
     def getByteCount(self) -> int: ...
@@ -16,21 +16,21 @@ class ColorItem(Structure):
 
 class ImageModSL:
     SL: CDLL
-    simpleColorReduce: Callable[[_Pointer[ImageData], c_int], None]
-    colorReduce: Callable[[_Pointer[ImageData], _Pointer[ColorItem], c_int], None]
-    splitColor: Callable[[_Pointer[ImageData], _Pointer[ColorItem], c_int], None]
-    colorReplace: Callable[[_Pointer[ImageData], c_int, _Pointer[ColorItem], _Pointer[ColorItem]], None]
-    fillSquareColor: Callable[[_Pointer[ImageData], c_int, c_int, c_int, c_int, _Pointer[ColorItem]], c_int]
-    padImage: Callable[[_Pointer[ImageData], _Pointer[ImageData], c_int, _Pointer[ColorItem]], None]
-    copyArea: Callable[[_Pointer[ImageData], _Pointer[ImageData], _Pointer[Area]], None]
-    eraseSegments: Callable[[_Pointer[ImageData], c_int, c_int, _Pointer[ColorItem]], None]
-    removeEmptyLines: Callable[[_Pointer[ImageData], _Pointer[ImageData], c_int, _Pointer[ColorItem]], None]
-    pixelMatch: Callable[[_Pointer[ImageData], _Pointer[ImageData], c_int, c_float], c_float]
-    getImagePosition: Callable[[_Pointer[ImageData], _Pointer[ImageData], _Pointer[MatchData], c_int, c_float, c_int, c_int, c_int], c_int]
-    getImageColors: Callable[[_Pointer[ImageData], _Pointer[ColorItem], c_int], c_int]
-    getImageColorPixels: Callable[[_Pointer[ImageData], _Pointer[ColorItem], _Pointer[c_int], c_int], c_int]
-    checkColorPresence: Callable[[_Pointer[ImageData], _Pointer[ColorItem], c_int, c_int], c_int]
-    getColorPixelCount: Callable[[_Pointer[ImageData], _Pointer[ColorItem], c_int], c_int]
-    getRelevantArea: Callable[[_Pointer[ImageData], _Pointer[Area], _Pointer[ColorItem]], None]
-    getElementList: Callable[[_Pointer[ImageData], _Pointer[Area], _Pointer[ColorItem], c_int, c_int], c_int]
+    simpleColorReduce: Callable[[pointID, u_int], None]
+    colorReduce: Callable[[pointID, pointCI, u_int], None]
+    splitColor: Callable[[pointID, pointCI, u_int], None]
+    colorReplace: Callable[[pointID, u_int, pointCI, pointCI], None]
+    fillSquareColor: Callable[[pointID, u_int, u_int, u_int, u_int, pointCI], c_int]
+    padImage: Callable[[pointID, pointID, u_int, pointCI], None]
+    copyArea: Callable[[pointID, pointID, pointAR], None]
+    eraseSegments: Callable[[pointID, u_int, u_int, pointCI], None]
+    removeEmptyLines: Callable[[pointID, pointID, u_int, pointCI], None]
+    pixelMatch: Callable[[pointID, pointID, u_int, u_float], c_float]
+    getImagePosition: Callable[[pointID, pointID, pointMD, u_int, u_float, u_int, u_int, u_int], c_int]
+    getImageColors: Callable[[pointID, pointCI, u_int], c_int]
+    getImageColorPixels: Callable[[pointID, pointCI, pointI, u_int], c_int]
+    checkColorPresence: Callable[[pointID, pointCI, u_int, u_int], c_int]
+    getColorPixelCount: Callable[[pointID, pointCI, u_int], c_int]
+    getRelevantArea: Callable[[pointID, pointAR, pointCI], None]
+    getElementList: Callable[[pointID, pointAR, pointCI, u_int, u_int], c_int]
     def __init__(self, path: str = '') -> None: ...

@@ -71,71 +71,78 @@ class ImageModSL:
 		except FileNotFoundError, OSError:
 			self.SL = CDLL(os.path.join(baseDir, libname))
 		#if the shared library was successfully loaded, we specify the return types and arguments for the various functions
+		u_int = c_int | int
+		u_float = c_float | float | int
+		pointID = _Pointer[ImageData] | Array[ImageData]
+		pointCI = _Pointer[ColorItem] | Array[ColorItem]
+		pointAR = _Pointer[Area] | Array[Area]
+		pointMD = _Pointer[MatchData] | Array[MatchData]
+		pointI = _Pointer[c_int] | Array[c_int]
 		#load the simple color reduce function
-		self.simpleColorReduce: Callable[[_Pointer[ImageData], c_int], None] = self.SL.SimpleColorReduce
+		self.simpleColorReduce: Callable[[pointID, u_int], None] = self.SL.SimpleColorReduce
 		self.simpleColorReduce.argtypes = [POINTER(ImageData), c_int]
 		self.simpleColorReduce.restype = None
 		#load the color reduce function
-		self.colorReduce: Callable[[_Pointer[ImageData], _Pointer[ColorItem], c_int], None] = self.SL.ColorReduce
+		self.colorReduce: Callable[[pointID, pointCI, u_int], None] = self.SL.ColorReduce
 		self.colorReduce.argtypes = [POINTER(ImageData), POINTER(ColorItem), c_int]
 		self.colorReduce.restype = None
 		#load the split color function
-		self.splitColor: Callable[[_Pointer[ImageData], _Pointer[ColorItem], c_int], None] = self.SL.SplitColor
+		self.splitColor: Callable[[pointID, pointCI, u_int], None] = self.SL.SplitColor
 		self.splitColor.argtypes = [POINTER(ImageData), POINTER(ColorItem), POINTER(c_int), c_int, c_int]
 		self.splitColor.restype = None
 		#load the color replace function
-		self.colorReplace: Callable[[_Pointer[ImageData], c_int, _Pointer[ColorItem], _Pointer[ColorItem]], None] = self.SL.ColorReplace
+		self.colorReplace: Callable[[pointID, u_int, pointCI, pointCI], None] = self.SL.ColorReplace
 		self.colorReplace.argtypes = [POINTER(ImageData), c_int, POINTER(ColorItem), POINTER(ColorItem)]
 		self.colorReplace.restype = None
 		#load the fill square color function
-		self.fillSquareColor: Callable[[_Pointer[ImageData], c_int, c_int, c_int, c_int, _Pointer[ColorItem]], c_int] = self.SL.FillSquareColor
+		self.fillSquareColor: Callable[[pointID, u_int, u_int, u_int, u_int, pointCI], c_int] = self.SL.FillSquareColor
 		self.fillSquareColor.argtypes = [POINTER(ImageData), c_int, c_int, c_int, c_int, POINTER(ColorItem)]
 		self.fillSquareColor.restype = c_int
 		#load the pad image function
-		self.padImage: Callable[[_Pointer[ImageData], _Pointer[ImageData], c_int, _Pointer[ColorItem]], None] = self.SL.PadImage
+		self.padImage: Callable[[pointID, pointID, u_int, pointCI], None] = self.SL.PadImage
 		self.padImage.argtypes = [POINTER(ImageData), POINTER(ImageData), c_int, POINTER(ColorItem)]
 		self.padImage.restype = None
 		#load the copy area function
-		self.copyArea: Callable[[_Pointer[ImageData], _Pointer[ImageData], _Pointer[Area]], None] = self.SL.CopyArea
+		self.copyArea: Callable[[pointID, pointID, pointAR], None] = self.SL.CopyArea
 		self.copyArea.argtypes = [POINTER(ImageData), POINTER(ImageData), POINTER(Area)]
 		self.copyArea.restype = None
 		#load the erase segments function
-		self.eraseSegments: Callable[[_Pointer[ImageData], c_int, c_int, _Pointer[ColorItem]], None] = self.SL.EraseSegments
+		self.eraseSegments: Callable[[pointID, u_int, u_int, pointCI], None] = self.SL.EraseSegments
 		self.eraseSegments.argtypes = [POINTER(ImageData), c_int, c_int, POINTER(ColorItem)]
 		self.eraseSegments.restype = None
 		#load the remove empty lines function
-		self.removeEmptyLines: Callable[[_Pointer[ImageData], _Pointer[ImageData], c_int, _Pointer[ColorItem]], None] = self.SL.RemoveEmptyLines
+		self.removeEmptyLines: Callable[[pointID, pointID, u_int, pointCI], None] = self.SL.RemoveEmptyLines
 		self.removeEmptyLines.argtypes = [POINTER(ImageData), POINTER(ImageData), c_int, POINTER(ColorItem)]
 		self.removeEmptyLines.restype = None
 		#load the pixel match function
-		self.pixelMatch: Callable[[_Pointer[ImageData], _Pointer[ImageData], c_int, c_float], c_float] = self.SL.PixelMatch
+		self.pixelMatch: Callable[[pointID, pointID, u_int, u_float], c_float] = self.SL.PixelMatch
 		self.pixelMatch.argtypes = [POINTER(ImageData), POINTER(ImageData), c_int, c_float]
 		self.pixelMatch.restype = c_float
 		#load the get image position function
-		self.getImagePosition: Callable[[_Pointer[ImageData], _Pointer[ImageData], _Pointer[MatchData], c_int, c_float, c_int, c_int, c_int], c_int] = self.SL.GetImagePosition
+		self.getImagePosition: Callable[[pointID, pointID, pointMD, u_int, u_float, u_int, u_int, u_int], c_int] = self.SL.GetImagePosition
 		self.getImagePosition.argtypes = [POINTER(ImageData), POINTER(ImageData), POINTER(MatchData), c_int, c_float, c_int, c_int, c_int]
 		self.getImagePosition.restype = c_int
 		#load the get image colors function
-		self.getImageColors: Callable[[_Pointer[ImageData], _Pointer[ColorItem], c_int], c_int] = self.SL.GetImageColors
+		self.getImageColors: Callable[[pointID, pointCI, u_int], c_int] = self.SL.GetImageColors
 		self.getImageColors.argtypes = [POINTER(ImageData), POINTER(ColorItem), c_int]
 		self.getImageColors.restype = c_int
 		#load the get image color pixels function
-		self.getImageColorPixels: Callable[[_Pointer[ImageData], _Pointer[ColorItem], _Pointer[c_int], c_int], c_int] = self.SL.GetImageColorPixels
+		self.getImageColorPixels: Callable[[pointID, pointCI, pointI, u_int], c_int] = self.SL.GetImageColorPixels
 		self.getImageColorPixels.argtypes = [POINTER(ImageData), POINTER(ColorItem), POINTER(c_int), c_int]
 		self.getImageColorPixels.restype = c_int
 		#load the check color presence function
-		self.checkColorPresence: Callable[[_Pointer[ImageData], _Pointer[ColorItem], c_int, c_int], c_int] = self.SL.CheckColorPresence
+		self.checkColorPresence: Callable[[pointID, pointCI, u_int, u_int], c_int] = self.SL.CheckColorPresence
 		self.checkColorPresence.argtypes = [POINTER(ImageData), POINTER(ColorItem), c_int, c_int]
 		self.checkColorPresence.restype = c_int
 		#load the get color pixel count function
-		self.getColorPixelCount: Callable[[_Pointer[ImageData], _Pointer[ColorItem], c_int], c_int] = self.SL.GetColorPixelCount
+		self.getColorPixelCount: Callable[[pointID, pointCI, u_int], c_int] = self.SL.GetColorPixelCount
 		self.getColorPixelCount.argtypes = [POINTER(ImageData), POINTER(ColorItem), c_int]
 		self.getColorPixelCount.restype = c_int
 		#load the relevant area function
-		self.getRelevantArea: Callable[[_Pointer[ImageData], _Pointer[Area], _Pointer[ColorItem]], None] = self.SL.GetRelevantArea
+		self.getRelevantArea: Callable[[pointID, pointAR, pointCI], None] = self.SL.GetRelevantArea
 		self.getRelevantArea.argtypes = [POINTER(ImageData), POINTER(Area), POINTER(ColorItem)]
 		self.getRelevantArea.restype = None
 		#load the get element list function
-		self.getElementList: Callable[[_Pointer[ImageData], _Pointer[Area], _Pointer[ColorItem], c_int, c_int], c_int] = self.SL.GetElementList
+		self.getElementList: Callable[[pointID, pointAR, pointCI, u_int, u_int], c_int] = self.SL.GetElementList
 		self.getElementList.argtypes = [POINTER(ImageData), POINTER(Area), POINTER(ColorItem), c_int, c_int]
 		self.getElementList.restype = c_int
