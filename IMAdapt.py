@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import pathlib
 import platform
+import typing
 from collections.abc import Callable
 from ctypes import CDLL, POINTER, Array, Structure, _Pointer, c_float, c_int, c_ubyte
 
@@ -71,13 +72,14 @@ class ImageModSL:
 		except FileNotFoundError, OSError:
 			self.SL = CDLL(os.path.join(baseDir, libname))
 		#if the shared library was successfully loaded, we specify the return types and arguments for the various functions
-		u_int = c_int | int
-		u_float = c_float | float | int
-		pointID = _Pointer[ImageData] | Array[ImageData]
-		pointCI = _Pointer[ColorItem] | Array[ColorItem]
-		pointAR = _Pointer[Area] | Array[Area]
-		pointMD = _Pointer[MatchData] | Array[MatchData]
-		pointI = _Pointer[c_int] | Array[c_int]
+		if typing.TYPE_CHECKING:
+			u_int = c_int | int
+			u_float = c_float | float | int
+			pointID = _Pointer[ImageData] | Array[ImageData] | ImageData
+			pointCI = _Pointer[ColorItem] | Array[ColorItem] | ColorItem
+			pointAR = _Pointer[Area] | Array[Area] | Area
+			pointMD = _Pointer[MatchData] | Array[MatchData] | MatchData
+			pointI = _Pointer[c_int] | Array[c_int]
 		#load the simple color reduce function
 		self.simpleColorReduce: Callable[[pointID, u_int], None] = self.SL.SimpleColorReduce
 		self.simpleColorReduce.argtypes = [POINTER(ImageData), c_int]
